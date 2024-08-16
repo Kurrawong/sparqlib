@@ -26,10 +26,8 @@ jobs:
       - name: Build wheel
         run: poetry build -f wheel
 
-      - name: Upload wheel to release assets
-        uses: actions/upload-release-asset@v1
+      - name: Upload release assets
+        uses: softprops/action-gh-release@v2
+        if: startsWith(github.ref, 'refs/tags/')
         with:
-          upload_url: ${{ github.event.release.upload_url }}
-          asset_path: ./dist
-          asset_name: sparql-${{ github.event.release.tag_name }}-py3-none-any.whl
-          asset_content_type: application/octet-stream
+          files: ./dist/sparql-${{ github.event.release.tag_name }}-py3-none-any.whl

@@ -33,7 +33,7 @@ jobs:
           files: ./dist/sparql-${{ github.event.release.tag_name }}-py3-none-any.whl
 
       - name: Rename wheel
-        run: mv ./dist/sparql-${{ github.event.release.tag_name }}-py3-none-any.whl ./dist/sparql-py3-none-any.whl
+        run: mv ./dist/sparql-${{ github.event.release.tag_name }}-py3-none-any.whl ./dist/sparql-1-py3-none-any.whl
 
       - name: Deploy 🚀
         uses: JamesIves/github-pages-deploy-action@v4

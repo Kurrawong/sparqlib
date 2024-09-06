@@ -5,7 +5,7 @@ import sparql
 
 
 def test_guess_sparql_update():
-    result = sparql.format_string_guess(
+    result = sparql.format_string(
         """
         LOAD <http://example.org/faraway> INTO GRAPH <localCopy>
     """
@@ -15,7 +15,7 @@ def test_guess_sparql_update():
 
 
 def test_guess_sparql():
-    result = sparql.format_string_guess(
+    result = sparql.format_string(
         """
         select distinct ?s (count(?s) as ?count)
         FROM <http://dbpedia.org>
@@ -37,7 +37,7 @@ def test_guess_sparql():
 
 def test_specify_sparql_parser():
     with pytest.raises(LarkError):
-        sparql.format_string(
+        sparql.format_string_explicit(
             """
             LOAD <http://example.org/faraway> INTO GRAPH <localCopy>
         """,
@@ -47,7 +47,7 @@ def test_specify_sparql_parser():
 
 def test_specify_sparql_update_parser():
     with pytest.raises(LarkError):
-        sparql.format_string(
+        sparql.format_string_explicit(
             """
             select distinct ?s (count(?s) as ?count)
         FROM <http://dbpedia.org>

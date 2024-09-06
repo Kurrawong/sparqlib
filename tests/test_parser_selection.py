@@ -5,7 +5,7 @@ import sparql
 
 
 def test_guess_sparql_update():
-    result = sparql.format_string(
+    result = sparql.format_string_guess(
         """
         LOAD <http://example.org/faraway> INTO GRAPH <localCopy>
     """
@@ -15,7 +15,7 @@ def test_guess_sparql_update():
 
 
 def test_guess_sparql():
-    result = sparql.format_string(
+    result = sparql.format_string_guess(
         """
         select distinct ?s (count(?s) as ?count)
         FROM <http://dbpedia.org>

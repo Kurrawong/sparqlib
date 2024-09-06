@@ -13,7 +13,6 @@ lark = "^1.1.8"
 
 [tool.poetry.group.dev.dependencies]
 pytest = "^7.4.3"
-black = "^23.12.1"
 ruff = "^0.1.11"
 
 [build-system]

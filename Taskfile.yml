@@ -9,13 +9,13 @@ tasks:
   code:check:
     desc: Check whether code formatting rules apply.
     cmds:
-      - poetry run black --check {{.package_name}} tests
+      - poetry run ruff format --check {{.package_name}} tests
       - poetry run ruff check {{.package_name}} tests
 
   code:
     desc: Format and standardise code.
     cmds:
-      - poetry run black {{.package_name}} tests
+      - poetry run ruff format {{.package_name}} tests
       - poetry run ruff --fix {{.package_name}} tests
 
   test:

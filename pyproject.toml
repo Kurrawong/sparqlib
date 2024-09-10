@@ -15,6 +15,9 @@ lark = "^1.1.8"
 pytest = "^7.4.3"
 ruff = "^0.1.11"
 
+[tool.poetry.scripts]
+sparql_fmt = "sparql:main"
+
 [build-system]
 requires = ["poetry-core"]
 build-backend = "poetry.core.masonry.api"

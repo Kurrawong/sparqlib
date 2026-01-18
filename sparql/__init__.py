@@ -38,7 +38,6 @@ def format_string(query: str) -> str:
         return sparql_serializer.result
 
 
-
 def format_string_explicit(query: str, parser_type: ParserType = "sparql") -> str:
     """Parse the input string and return a formatted version of it.
 

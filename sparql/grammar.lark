@@ -50,7 +50,7 @@ where_clause: /WHERE/i? group_graph_pattern
 
 solution_modifier: group_clause? having_clause? order_clause? limit_offset_clauses?
 
-group_clause: /GROUP/i? /BY/i group_condition+
+group_clause: /GROUP/i /BY/i group_condition+
 
 group_condition: built_in_call | function_call | group_condition_expression_as_var | var
 

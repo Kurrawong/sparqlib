@@ -163,7 +163,7 @@ built_in_call: aggregate
                | /TZ/i LEFT_PARENTHESIS expression RIGHT_PARENTHESIS
                | /NOW/i NIL
                | /UUID/i NIL
-               | /STRUUID/ NIL
+               | /STRUUID/i NIL
                | /MD5/i LEFT_PARENTHESIS expression RIGHT_PARENTHESIS
                | /SHA1/i LEFT_PARENTHESIS expression RIGHT_PARENTHESIS
                | /SHA256/i LEFT_PARENTHESIS expression RIGHT_PARENTHESIS

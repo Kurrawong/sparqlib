@@ -4,6 +4,12 @@ from typing import Any, Callable, NamedTuple, NotRequired, Optional, TypedDict, 
 from lark import Token, Tree
 
 
+class SerializerError(Exception):
+    """Raised when the serializer encounters an unexpected tree structure."""
+
+    pass
+
+
 class TraversalPhase(Enum):
     """Phases of tree traversal."""
 
@@ -25,9 +31,40 @@ class TraversalContext(TypedDict, total=False):
     indent_inc: bool
 
 
+def _safe_get_child(
+    node: Tree, index: int, expected_type: Optional[type] = None, context: str = ""
+) -> Any:
+    """Safely get a child node at the given index.
+
+    :param node: The parent tree node.
+    :param index: The index of the child to retrieve.
+    :param expected_type: Optional type to validate the child against.
+    :param context: Context string for error messages.
+    :return: The child node.
+    :raises SerializerError: If the child doesn't exist or has wrong type.
+    """
+    if not hasattr(node, "children") or node.children is None:
+        raise SerializerError(
+            f"Node has no children{f' in {context}' if context else ''}: {node}"
+        )
+    if index >= len(node.children) or index < -len(node.children):
+        raise SerializerError(
+            f"Child index {index} out of range for node with {len(node.children)} children"
+            f"{f' in {context}' if context else ''}: {node.data if hasattr(node, 'data') else node}"
+        )
+    child = node.children[index]
+    if expected_type is not None and not isinstance(child, expected_type):
+        raise SerializerError(
+            f"Expected child of type {expected_type.__name__}, got {type(child).__name__}"
+            f"{f' in {context}' if context else ''}"
+        )
+    return child
+
+
 def get_prefixed_name(prefixed_name: Tree) -> str:
     """Extracts the value from a prefixed_name node."""
-    return prefixed_name.children[0].value
+    child = _safe_get_child(prefixed_name, 0, Token, "prefixed_name")
+    return child.value
 
 
 def get_iriref(iriref: Token) -> str:
@@ -37,14 +74,23 @@ def get_iriref(iriref: Token) -> str:
 
 def get_rdf_literal(rdf_literal: Tree) -> str:
     """Extracts the string representation of an rdf_literal node."""
-    value = rdf_literal.children[0].children[0].value
+    string_node = _safe_get_child(rdf_literal, 0, Tree, "rdf_literal.string")
+    value_token = _safe_get_child(string_node, 0, Token, "rdf_literal.string.value")
+    value = value_token.value
 
     if len(rdf_literal.children) > 1:
-        langtag_or_datatype = rdf_literal.children[1].children[0]
+        suffix_node = _safe_get_child(rdf_literal, 1, Tree, "rdf_literal.suffix")
+        langtag_or_datatype = _safe_get_child(
+            suffix_node, 0, context="rdf_literal.langtag_or_datatype"
+        )
         if isinstance(langtag_or_datatype, Tree) and langtag_or_datatype.data == "iri":
             value += f"^^{get_iri(langtag_or_datatype)}"
+        elif isinstance(langtag_or_datatype, Token):
+            value += langtag_or_datatype.value
         else:
-            value += rdf_literal.children[1].children[0].value
+            raise SerializerError(
+                f"Unexpected langtag_or_datatype type in rdf_literal: {type(langtag_or_datatype)}"
+            )
 
     return value
 
@@ -65,57 +111,58 @@ def get_value(
         node = stack.pop()
         if isinstance(node, Token):
             memory.append(node)
-        else:
-            # Push children in reverse order so they are processed left-to-right
+        elif isinstance(node, Tree) and node.children:
             for child in reversed(node.children):
-                stack.append(child)
+                if child is not None:
+                    stack.append(child)
 
     return memory
 
 
 def get_iri(iri: Tree) -> str:
     """Extracts the string representation of an iri node."""
+    if not iri.children:
+        raise SerializerError(f"iri node has no children: {iri}")
+
     value = iri.children[0]
     if isinstance(value, Token):
         return get_iriref(value)
     elif isinstance(value, Tree):
         return get_prefixed_name(value)
     else:
-        raise ValueError(f"Unexpected iri type: {value.data}")
+        raise SerializerError(
+            f"Unexpected iri child type: {type(value).__name__}, expected Token or Tree"
+        )
 
 
 def get_data_block_value(data_block_value: Tree) -> str:
     """Extracts the string representation of a data_block_value node."""
-    value = data_block_value.children[0]
+    value = _safe_get_child(data_block_value, 0, Tree, "data_block_value")
+
+    if not hasattr(value, "data"):
+        raise SerializerError(
+            f"data_block_value child has no 'data' attribute: {type(value)}"
+        )
 
     if value.data == "iri":
         return get_iri(value)
-    elif (
-        value.data == "rdf_literal"
-        or value.data == "numeric_literal"
-        or value.data == "boolean_literal"
-    ):
+    elif value.data in ("rdf_literal", "numeric_literal", "boolean_literal"):
         return get_rdf_literal(value)
     elif value.data == "undef":
         return "UNDEF"
     else:
-        raise ValueError(f"Unexpected data_block_value type: {value.data}")
+        raise SerializerError(f"Unexpected data_block_value type: {value.data}")
 
 
 def get_var(var: Tree) -> str:
     """Extracts the variable name from a var node."""
-    return var.children[0].value
+    child = _safe_get_child(var, 0, Token, "var")
+    return child.value
 
 
 def get_vars(vars_: list[Tree]) -> str:
     """Joins variable names with spaces."""
-    result = ""
-    for i, var in enumerate(vars_):
-        result += get_var(var)
-        if i + 1 != len(vars_):
-            result += " "
-
-    return result
+    return " ".join(get_var(var) for var in vars_)
 
 
 class SparqlSerializer:

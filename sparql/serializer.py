@@ -1,3 +1,5 @@
+import warnings
+
 from lark import Token, Tree
 from lark.visitors import Visitor_Recursive
 
@@ -80,6 +82,12 @@ def get_vars(vars_: list[Tree]) -> str:
 
 class SparqlSerializer(Visitor_Recursive):
     def __init__(self):
+        warnings.warn(
+            "SparqlSerializer (recursive) is deprecated and will be removed in a future version. "
+            "Use IterativeSparqlSerializer instead, or use the public format_string() API.",
+            DeprecationWarning,
+            stacklevel=2,
+        )
         self._result = ""
         super().__init__()
         self._indent = 0

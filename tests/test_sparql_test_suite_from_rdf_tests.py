@@ -13,11 +13,6 @@ data_dir = current_dir / "data/sparql_test_suite_from_rdf_tests"
     [
         *files_from_data_directory(
             data_dir,
-            {
-                (
-                    data_dir / "sparql11/syntax-update-2/large-request-01.ru"
-                ).resolve(): "Downside to the current serializer is that it uses a recursive approach to walk the AST. This large query hits the standard Python recursion depth limit.",
-            },
         )
     ],
 )

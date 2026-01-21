@@ -1,3 +1,4 @@
+import os
 from pathlib import Path
 
 import lark
@@ -5,6 +6,7 @@ import pytest
 
 from sparql.parser import sparql_parser, sparql_update_parser
 from sparql.serializer import SparqlSerializer
+from sparql.serializer_iterative import IterativeSparqlSerializer
 
 TEST_DIR = Path(__file__).parent
 
@@ -25,7 +27,14 @@ def test_roundtrip():
                 parser = sparql_update_parser
                 tree = parser.parse(query)
 
-            sparql_serializer = SparqlSerializer()
+            use_iterative = (
+                os.getenv("SPARQL_USE_ITERATIVE_SERIALIZER", "true").lower() == "true"
+            )
+            if use_iterative:
+                sparql_serializer = IterativeSparqlSerializer()
+            else:
+                sparql_serializer = SparqlSerializer()
+
             sparql_serializer.visit_topdown(tree)
 
             new_tree = parser.parse(sparql_serializer.result)

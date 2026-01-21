@@ -1,13 +1,13 @@
 import pytest
 
 from sparql.parser import sparql_parser
-from sparql.serializer_iterative import IterativeSparqlSerializer
+from sparql.serializer import SparqlSerializer
 
 
 def test_property_path_alternative():
     query = "SELECT * WHERE { ?s foaf:knows|foaf:friend ?o }"
     tree = sparql_parser.parse(query)
-    serializer = IterativeSparqlSerializer()
+    serializer = SparqlSerializer()
     result = serializer.visit_topdown(tree)
     assert "foaf:knows |foaf:friend" in result
 
@@ -15,7 +15,7 @@ def test_property_path_alternative():
 def test_property_path_sequence():
     query = "SELECT * WHERE { ?s foaf:knows/foaf:name ?o }"
     tree = sparql_parser.parse(query)
-    serializer = IterativeSparqlSerializer()
+    serializer = SparqlSerializer()
     result = serializer.visit_topdown(tree)
     assert "foaf:knows /foaf:name" in result
 
@@ -23,7 +23,7 @@ def test_property_path_sequence():
 def test_property_path_inverse():
     query = "SELECT * WHERE { ?s ^foaf:knows ?o }"
     tree = sparql_parser.parse(query)
-    serializer = IterativeSparqlSerializer()
+    serializer = SparqlSerializer()
     result = serializer.visit_topdown(tree)
     assert "^foaf:knows" in result
 
@@ -31,7 +31,7 @@ def test_property_path_inverse():
 def test_property_path_complex():
     query = "SELECT * WHERE { ?s ^foaf:knows/(foaf:friend|foaf:colleague)* ?o }"
     tree = sparql_parser.parse(query)
-    serializer = IterativeSparqlSerializer()
+    serializer = SparqlSerializer()
     result = serializer.visit_topdown(tree)
     # The exact formatting might have some extra spaces but the logic should be there
     assert "^foaf:knows/(foaf:friend|foaf:colleague)*" in result.replace(" ", "")
@@ -40,7 +40,7 @@ def test_property_path_complex():
 def test_negated_property_set():
     query = "SELECT * WHERE { ?s !(foaf:knows|^foaf:friend) ?o }"
     tree = sparql_parser.parse(query)
-    serializer = IterativeSparqlSerializer()
+    serializer = SparqlSerializer()
     result = serializer.visit_topdown(tree)
     assert "!(foaf:knows|^foaf:friend)" in result.replace(" ", "")
 

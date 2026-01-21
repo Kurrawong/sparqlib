@@ -4,10 +4,10 @@ import pytest
 from lark import Token, Tree
 
 from sparql.parser import sparql_parser
-from sparql.serializer_iterative import IterativeSparqlSerializer
+from sparql.serializer import SparqlSerializer
 
 
-class CustomSerializer(IterativeSparqlSerializer):
+class CustomSerializer(SparqlSerializer):
     """A custom serializer that uppercases all variables."""
 
     def _build_handler_map(self):
@@ -25,7 +25,7 @@ class CustomSerializer(IterativeSparqlSerializer):
         return True
 
 
-class ExtendedSerializer(IterativeSparqlSerializer):
+class ExtendedSerializer(SparqlSerializer):
     """A serializer that adds a custom prefix to NIL tokens."""
 
     def _build_handler_map(self):
@@ -48,7 +48,7 @@ def test_subclass_can_override_handler():
     tree = sparql_parser.parse(query)
 
     # Base serializer should produce lowercase variables
-    base_ser = IterativeSparqlSerializer()
+    base_ser = SparqlSerializer()
     base_result = base_ser.visit_topdown(tree)
     assert "?x" in base_result
     assert "?X" not in base_result
@@ -71,7 +71,7 @@ def test_base_class_unaffected_by_subclass():
     custom_result = custom_ser.visit_topdown(tree)
 
     # Now create a base serializer - it should NOT use the custom handler
-    base_ser = IterativeSparqlSerializer()
+    base_ser = SparqlSerializer()
     base_result = base_ser.visit_topdown(tree)
 
     # Base result should have lowercase variables
@@ -106,19 +106,19 @@ def test_multiple_subclasses_independent():
 def test_handler_cache_efficiency():
     """Verify handler map is cached and not rebuilt for each instance."""
     # Clear the cache first
-    IterativeSparqlSerializer._handler_cache.clear()
+    SparqlSerializer._handler_cache.clear()
 
     # Create multiple instances
-    ser1 = IterativeSparqlSerializer()
-    ser2 = IterativeSparqlSerializer()
-    ser3 = IterativeSparqlSerializer()
+    ser1 = SparqlSerializer()
+    ser2 = SparqlSerializer()
+    ser3 = SparqlSerializer()
 
     # All should share the same handler map instance
     assert ser1._handler_map is ser2._handler_map
     assert ser2._handler_map is ser3._handler_map
 
     # Cache should only have one entry for the base class
-    assert len(IterativeSparqlSerializer._handler_cache) == 1
+    assert len(SparqlSerializer._handler_cache) == 1
 
 
 if __name__ == "__main__":

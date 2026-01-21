@@ -1069,8 +1069,6 @@ class SparqlSerializer:
     def _path_one_in_property_set_enter(
         self, tree: Tree, context: dict[str, Any]
     ) -> bool:
-        from sparql.serializer_base import get_iri
-
         if len(tree.children) == 2:  # CARET (iri | A)
             self._parts.append("^")
             value = tree.children[1]
@@ -1350,8 +1348,6 @@ class SparqlSerializer:
         return True
 
     def _iri_enter(self, tree: Tree, context: dict[str, Any]) -> bool:
-        from sparql.serializer_base import get_iri
-
         self._parts.append(f"{get_iri(tree)} ")
         return True
 
@@ -1359,7 +1355,6 @@ class SparqlSerializer:
         self, tree: Tree, context: dict[str, Any]
     ) -> bool:
         # select_clause_expression_as_var: "(" expression /AS/i var ")"
-        from sparql.serializer_base import get_var
 
         self._parts.append("(")
         self._stack.append((Token("RAW", ") "), TraversalPhase.ENTER, context))
@@ -1375,14 +1370,10 @@ class SparqlSerializer:
         return True
 
     def _var_enter(self, tree: Tree, context: dict[str, Any]) -> bool:
-        from sparql.serializer_base import get_var
-
         self._parts.append(f"{get_var(tree)} ")
         return True
 
     def _rdf_literal_enter(self, tree: Tree, context: dict[str, Any]) -> bool:
-        from sparql.serializer_base import get_rdf_literal
-
         self._parts.append(f"{get_rdf_literal(tree)} ")
         return True
 

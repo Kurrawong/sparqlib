@@ -1,5 +1,5 @@
 from sparql.parser import sparql_parser
-from sparql.serializer_iterative import IterativeSparqlSerializer
+from sparql.serializer import SparqlSerializer
 
 
 def test_minimal_serialization():
@@ -8,7 +8,7 @@ def test_minimal_serialization():
     query = "SELECT * WHERE { ?s ?p ?o }"
     tree = sparql_parser.parse(query)
 
-    serializer = IterativeSparqlSerializer()
+    serializer = SparqlSerializer()
     result = serializer.visit_topdown(tree)
 
     # We expect something like "SELECT * WHERE { ?s ?p ?o } " due to _handle_token adding space

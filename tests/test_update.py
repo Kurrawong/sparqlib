@@ -1,13 +1,13 @@
 import pytest
 
 from sparql.parser import sparql_update_parser
-from sparql.serializer_iterative import IterativeSparqlSerializer
+from sparql.serializer import SparqlSerializer
 
 
 def test_insert_data():
     query = "INSERT DATA { <http://example.org/s> <http://example.org/p> <http://example.org/o> }"
     tree = sparql_update_parser.parse(query)
-    serializer = IterativeSparqlSerializer()
+    serializer = SparqlSerializer()
     result = serializer.visit_topdown(tree)
     # The exact formatting might vary, let's see what it produces
     assert "INSERT DATA" in result
@@ -19,7 +19,7 @@ def test_insert_data():
 def test_delete_where():
     query = "DELETE WHERE { ?s ?p ?o }"
     tree = sparql_update_parser.parse(query)
-    serializer = IterativeSparqlSerializer()
+    serializer = SparqlSerializer()
     result = serializer.visit_topdown(tree)
     assert "DELETE WHERE" in result
     assert "?s" in result
@@ -30,7 +30,7 @@ def test_insert_data_graph():
 
     tree = sparql_update_parser.parse(query)
 
-    serializer = IterativeSparqlSerializer()
+    serializer = SparqlSerializer()
 
     result = serializer.visit_topdown(tree)
 
@@ -42,7 +42,7 @@ def test_insert_data_graph():
 def test_multiple_updates():
     query = "DROP ALL; CREATE GRAPH <http://example.org/g>"
     tree = sparql_update_parser.parse(query)
-    serializer = IterativeSparqlSerializer()
+    serializer = SparqlSerializer()
     result = serializer.visit_topdown(tree)
     assert "DROP ALL" in result
     assert "CREATE GRAPH" in result

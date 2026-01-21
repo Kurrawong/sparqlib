@@ -1,16 +1,12 @@
-# Iterative SPARQL Serializer Architecture
+# SPARQL Serializer Architecture
 
-This document describes the architecture of the iterative SPARQL serializer implemented in `sparql/serializer_iterative.py`.
+This document describes the architecture of the SPARQL serializer implemented in `sparql/serializer.py`.
 
-## Background
+## Overview
 
-The original SPARQL serializer was implemented using a recursive tree-walking approach (`Visitor_Recursive`). While simple and intuitive, it was limited by Python's recursion depth (default ~1000). For extremely large or deeply nested SPARQL queries, this would result in a `RecursionError`.
-
-The iterative serializer replaces the recursive call stack with an explicit stack managed within the serializer. This allows for queries of arbitrary depth, limited only by available memory.
+The serializer uses an iterative stack-based approach to traverse and serialize Lark AST trees. This design avoids Python's recursion limit, allowing serialization of queries with arbitrary nesting depth.
 
 ## Core Design
-
-The serializer uses a two-phase top-down traversal of the Lark AST.
 
 ### 1. Stack-Based Traversal
 
@@ -18,8 +14,6 @@ The traversal is managed by a `while` loop that pops frames from an explicit sta
 - `node`: The Lark `Tree` or `Token` to process.
 - `phase`: Either `ENTER` or `EXIT`.
 - `context`: An optional dictionary for passing state down the tree.
-
-#### Traversal Flow Diagram
 
 ```
        +-------------------+
@@ -68,49 +62,38 @@ to Output                    |
 
 ### 2. Handler Pattern
 
-Instead of using method dispatch based on name (like `visit_<node_name>`), the iterative serializer uses a pre-computed `_handler_map`. This map associates each `Tree` data type with a `TreeHandler` containing:
-- `enter`: A method called before processing children.
-- `exit`: A method called after processing children.
+The serializer uses a pre-computed `_handler_map` that associates each `Tree` data type with handlers:
+- `enter`: Called before processing children.
+- `exit`: Called after processing children.
 
-```python
-class TreeHandler(NamedTuple):
-    enter: Optional[Callable]
-    exit: Optional[Callable]
-```
-
-To optimize performance, the `_handler_map` is cached at the class level and uses unbound methods, passing `self` explicitly.
+To optimize performance, the `_handler_map` is cached at the class level and uses unbound methods.
 
 ### 3. Traversal Phases
 
 For each `Tree` node:
 1. **ENTER**: The `enter` handler is called.
 2. If `enter` returns `True`, children are skipped (handled by the handler itself).
-3. If `enter` returns `False` or `None`, an `EXIT` frame for the current node is pushed to the stack, followed by all children in reverse order (to ensure left-to-right processing when popped).
-4. **EXIT**: After all children have been processed, the `exit` frame is popped and the `exit` handler is called.
+3. If `enter` returns `False` or `None`, an `EXIT` frame is pushed, followed by all children in reverse order.
+4. **EXIT**: After all children are processed, the `exit` handler is called.
 
 For each `Token`:
 - It is processed immediately by `_handle_token`, which appends its value to the result list.
 
 ### 4. String Building
 
-The serializer avoids repeated string concatenation (`+=`), which is O(n^2) in some Python versions. Instead, it maintains a list of string parts (`_parts`) and joins them once at the end (`".join(self._parts)`), which is O(n).
+The serializer avoids repeated string concatenation. It maintains a list of string parts (`_parts`) and joins them once at the end, which is O(n) instead of O(n²).
 
 ## Extending the Serializer
 
-You can extend the `IterativeSparqlSerializer` to handle custom AST nodes or override existing behavior.
-
-### Example: Custom Handler
+You can extend `SparqlSerializer` to handle custom AST nodes or override existing behavior:
 
 ```python
-from sparql.serializer_iterative import IterativeSparqlSerializer
+from sparql.serializer import SparqlSerializer
 from lark import Tree
 
-class MySerializer(IterativeSparqlSerializer):
+class MySerializer(SparqlSerializer):
     def _build_handler_map(self):
-        # Get default map
         handlers = super()._build_handler_map()
-        
-        # Add custom handler
         handlers["my_custom_node"] = {
             "enter": self.__class__._my_node_enter,
             "exit": None
@@ -119,22 +102,11 @@ class MySerializer(IterativeSparqlSerializer):
 
     def _my_node_enter(self, tree: Tree, context: dict) -> bool:
         self._parts.append("CUSTOM_START ")
-        # Return False to process children normally
-        return False
+        return False  # Process children normally
 ```
 
 ## Performance Characteristics
 
-- **Initialization**: Caching the `_handler_map` at the class level significantly reduces instance creation time.
-- **Traversal**: The iterative approach is comparable to or faster than recursion for small queries, and significantly faster for deep/large queries.
-- **Memory**: Memory usage is generally lower than recursion because we avoid the overhead of Python stack frames for every node.
-
-## Comparison Table
-
-| Feature | Recursive Serializer | Iterative Serializer |
-|---------|----------------------|----------------------|
-| Max Depth | ~1000 (Python limit) | Arbitrary (Memory limit) |
-| Performance | Good (Small queries) | Excellent (All sizes) |
-| Stability | Risk of RecursionError| Very High |
-| Output | Identical | Identical |
-| API | Deprecated | Recommended |
+- **Initialization**: The `_handler_map` is cached at the class level for fast instance creation.
+- **Traversal**: The iterative approach handles queries of any depth without stack overflow.
+- **Memory**: Memory usage is generally lower than recursion due to avoiding Python stack frame overhead.

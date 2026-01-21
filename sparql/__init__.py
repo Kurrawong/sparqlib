@@ -54,6 +54,31 @@ def _contains(pattern: str, text: str) -> bool:
     return True if re.search(pattern, text, re.IGNORECASE) is not None else False
 
 
+def _guess_parser_type(query: str) -> ParserType:
+    """Guess the parser type based on keywords in the query.
+
+    This is a heuristic to improve performance by trying the most likely
+    parser first. It is not guaranteed to be correct.
+    """
+    # specific keywords that strongly suggest an UPDATE query
+    # Note: INSERT/DELETE can occur in CONSTRUCT/subqueries (though usually as 'INSERT DATA' etc for updates)
+    # But as top-level keywords, they indicate Update.
+    # We look for these keywords. If found, we guess 'sparql_update'.
+    # A more robust check might skip PREFIX/BASE, but this is just a hint.
+    update_keywords = r"(?i)\b(INSERT|DELETE|LOAD|CLEAR|DROP|ADD|MOVE|COPY|CREATE|WITH)\b"
+    
+    # Query keywords
+    query_keywords = r"(?i)\b(SELECT|CONSTRUCT|ASK|DESCRIBE)\b"
+
+    has_update = _contains(update_keywords, query)
+    has_query = _contains(query_keywords, query)
+
+    if has_update and not has_query:
+        return "sparql_update"
+    # Default to sparql (Query) as it's the most common case, or if ambiguous
+    return "sparql"
+
+
 def validate(query: str, parser_type: Optional[ParserType] = None) -> bool:
     """Validate a SPARQL query without serializing it.
 
@@ -64,6 +89,26 @@ def validate(query: str, parser_type: Optional[ParserType] = None) -> bool:
     :return: True if the query is valid.
     :raises SparqlSyntaxError: If the query has a syntax error.
     """
+    if parser_type is None:
+        # specific optimization: guess type to avoid double parsing penalty
+        parser_type = _guess_parser_type(query)
+        # We will try the guessed one first, then fallback
+        try:
+            return validate(query, parser_type)
+        except SparqlSyntaxError as e:
+            # If the guess failed, try the other one
+            other_type: ParserType = "sparql_update" if parser_type == "sparql" else "sparql"
+            try:
+                return validate(query, other_type)
+            except SparqlSyntaxError:
+                # If both fail, raise the error from the guessed type (original attempt)
+                # or maybe the first one makes more sense? 
+                # Actually, if the user didn't specify, we usually assume Query implies Query syntax error.
+                # But if it was an Update, we want that error.
+                # Let's raise the error corresponding to the one that matched the structure closest?
+                # For now, let's just re-raise the first one as it was the "best guess".
+                raise e
+
     if parser_type == "sparql":
         try:
             sparql_parser.parse(query)
@@ -76,48 +121,43 @@ def validate(query: str, parser_type: Optional[ParserType] = None) -> bool:
             return True
         except (LarkError, UnexpectedInput) as e:
             raise _wrap_lark_error(e, "SPARQL update") from e
-    else:
-        query_error: Optional[Exception] = None
-        try:
-            sparql_parser.parse(query)
-            return True
-        except (LarkError, UnexpectedInput) as e:
-            query_error = e
-
-        try:
-            sparql_update_parser.parse(query)
-            return True
-        except (LarkError, UnexpectedInput) as update_error:
-            raise _wrap_lark_error(query_error, "SPARQL query") from query_error
+    
+    return False
 
 
 def format_string(query: str) -> str:
     """Parse the input string and return a formatted version of it.
 
-    It first attempts to parse the query as a SPARQL 1.1 query before
-    trying to parse it as a SPARQL 1.1 Update query.
+    It first attempts to parse the query based on a heuristic guess,
+    falling back to the other parser if the first fails.
 
     :param query: Input query string.
     :return: Formatted query.
     :raises SparqlSyntaxError: If the query has a syntax error.
     """
-    query_error: Optional[Exception] = None
+    guessed_type = _guess_parser_type(query)
+    primary_parser = sparql_parser if guessed_type == "sparql" else sparql_update_parser
+    secondary_parser = sparql_update_parser if guessed_type == "sparql" else sparql_parser
+    
+    first_error: Optional[Exception] = None
 
     try:
-        tree = sparql_parser.parse(query)
+        tree = primary_parser.parse(query)
         serializer = SparqlSerializer()
         serializer.visit_topdown(tree)
         return serializer.result
     except (LarkError, UnexpectedInput) as e:
-        query_error = e
+        first_error = e
 
     try:
-        tree = sparql_update_parser.parse(query)
+        tree = secondary_parser.parse(query)
         serializer = SparqlSerializer()
         serializer.visit_topdown(tree)
         return serializer.result
     except (LarkError, UnexpectedInput):
-        raise _wrap_lark_error(query_error, "SPARQL query") from query_error
+        # Raise error for the primary guess type, as it was the most likely intent
+        context = "query" if guessed_type == "sparql" else "update"
+        raise _wrap_lark_error(first_error, f"SPARQL {context}") from first_error
 
 
 def format_string_explicit(query: str, parser_type: ParserType = "sparql") -> str:

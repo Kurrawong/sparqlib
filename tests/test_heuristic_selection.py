@@ -1,6 +1,15 @@
+from unittest.mock import MagicMock, patch
+
 import pytest
-from unittest.mock import patch, MagicMock
-from sparql import _guess_parser_type, format_string, validate, sparql_parser, sparql_update_parser
+
+from sparql import (
+    _guess_parser_type,
+    format_string,
+    sparql_parser,
+    sparql_update_parser,
+    validate,
+)
+
 
 def test_guess_parser_type_update():
     """Test that Update queries are correctly identified."""
@@ -13,6 +22,7 @@ def test_guess_parser_type_update():
     # Case insensitive
     assert _guess_parser_type("insert data { }") == "sparql_update"
 
+
 def test_guess_parser_type_query():
     """Test that Select/Construct queries are correctly identified."""
     assert _guess_parser_type("SELECT * WHERE { ?s ?p ?o }") == "sparql"
@@ -22,63 +32,67 @@ def test_guess_parser_type_query():
     # Default fallback
     assert _guess_parser_type("PREFIX : <http://example.org/>") == "sparql"
 
+
 def test_guess_parser_type_ambiguous():
     """Test mixed keywords favor Query if ambiguous or standard."""
-    # SELECT with INSERT inside a string or comment? 
+    # SELECT with INSERT inside a string or comment?
     # The heuristic checks for presence. If both present, it returns 'sparql'.
     query = "SELECT * WHERE { ?s ?p 'INSERT' }"
     assert _guess_parser_type(query) == "sparql"
 
+
 def test_format_string_uses_heuristic_success():
     """Test that format_string uses the heuristic and succeeds."""
     query = "INSERT DATA { <s> <p> <o> }"
-    
+
     # We can patch the parsers to see which one is called first.
     # But since we want to test the *real* logic, we can verify it works.
     result = format_string(query)
     assert "INSERT DATA" in result
 
+
 def test_format_string_fallback():
     """Test that if heuristic guesses wrong, it falls back to the other parser."""
     # A query that looks like Update but is actually a Select?
     # Or vice versa.
-    # Let's craft a SELECT query that has UPDATE keywords in comments or strings, 
-    # but we want to force a WRONG guess. 
+    # Let's craft a SELECT query that has UPDATE keywords in comments or strings,
+    # but we want to force a WRONG guess.
     # Current logic: if has_update and not has_query -> update.
     # If has_query -> sparql.
-    
+
     # So to fool it to think it's UPDATE, we need UPDATE keywords but NO query keywords.
     # But a valid query must have SELECT/CONSTRUCT/ASK/DESCRIBE.
     # So it's hard to make a valid Query that guesses Update.
-    
+
     # Let's try to fool it to think it's QUERY but it's actually UPDATE.
-    # Update with SELECT? 
+    # Update with SELECT?
     # "INSERT { ?s ?p ?o } WHERE { SELECT ... }" is valid Update.
     # If it has SELECT, heuristic says "sparql".
-    
+
     query = "INSERT { ?s ?p ?o } WHERE { SELECT ?s WHERE { ?s ?p ?o } }"
-    # Heuristic sees INSERT and SELECT. 
+    # Heuristic sees INSERT and SELECT.
     # _guess_parser_type logic: if has_update and not has_query -> update. Else sparql.
     # So it returns 'sparql'.
     assert _guess_parser_type(query) == "sparql"
-    
+
     # But this is an UPDATE query!
     # So 'sparql_parser.parse(query)' will FAIL.
     # Then it should fallback to 'sparql_update_parser.parse(query)', which should SUCCEED.
-    
+
     result = format_string(query)
     assert "INSERT" in result
     assert "SELECT" in result
 
+
 def test_validate_heuristic():
     """Test validate uses the heuristic."""
     from sparql import SparqlSyntaxError
+
     # Update query
     assert validate("INSERT DATA { <s> <p> <o> }") is True
     # Query query
     assert validate("SELECT * WHERE { ?s ?p ?o }") is True
-    
+
     # Invalid query
     with pytest.raises(SparqlSyntaxError):
         validate("NOT A QUERY")
-

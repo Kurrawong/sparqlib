@@ -742,7 +742,7 @@ class SparqlSerializer:
         where_token = self._find_token(tree, "WHERE")
         if where_token:
             self._parts.append(f"\n" + ("\t" * self._indent) + f"{where_token.value} ")
-        
+
         # Traverse any children that are Trees (graph pattern)
         # Note: if there is a where token, the pattern is usually next, but we just traverse all children
         # except the where token? Actually existing logic pushed child[1].
@@ -757,11 +757,11 @@ class SparqlSerializer:
         # Robustly find FROM or NAMED
         from_token = self._find_token(tree, "FROM")
         named_token = self._find_token(tree, "NAMED")
-        
+
         if from_token:
-             self._parts.append(f"{from_token.value} ")
+            self._parts.append(f"{from_token.value} ")
         if named_token:
-             self._parts.append(f"{named_token.value} ")
+            self._parts.append(f"{named_token.value} ")
 
         # Traverse source selector (usually second child)
         # We can just push all children that are not the FROM/NAMED tokens
@@ -777,15 +777,15 @@ class SparqlSerializer:
     def _group_clause_enter(self, tree: Tree, context: dict[str, Any]) -> bool:
         group_token = self._find_token(tree, "GROUP")
         by_token = self._find_token(tree, "BY")
-        
+
         prefix = ""
         if group_token:
             prefix += f"{group_token.value} "
         if by_token:
             prefix += f"{by_token.value} "
-            
+
         self._parts.append(("\t" * self._indent) + prefix)
-        
+
         # Traverse children in reverse order, excluding keywords
         for i in range(len(tree.children) - 1, -1, -1):
             child = tree.children[i]
@@ -797,7 +797,7 @@ class SparqlSerializer:
         having_token = self._find_token(tree, "HAVING")
         if having_token:
             self._parts.append(f"\n" + ("\t" * self._indent) + f"{having_token.value} ")
-            
+
         for i in range(len(tree.children) - 1, -1, -1):
             child = tree.children[i]
             if child is not having_token:
@@ -807,7 +807,7 @@ class SparqlSerializer:
     def _order_clause_enter(self, tree: Tree, context: dict[str, Any]) -> bool:
         order_token = self._find_token(tree, "ORDER")
         by_token = self._find_token(tree, "BY")
-        
+
         prefix = ""
         if order_token:
             prefix += f"{order_token.value} "
@@ -815,7 +815,7 @@ class SparqlSerializer:
             prefix += f"{by_token.value} "
 
         self._parts.append(f"\n" + ("\t" * self._indent) + prefix)
-        
+
         for i in range(len(tree.children) - 1, -1, -1):
             child = tree.children[i]
             if child is not order_token and child is not by_token:
@@ -827,12 +827,12 @@ class SparqlSerializer:
         # INTEGER is a token type, not value. The value is variable.
         # But wait, limit_clause grammar is: /LIMIT/i INTEGER
         # So we have 2 children: Token(LIMIT), Token(INTEGER)
-        
+
         # We can just append all children values since they are tokens
         self._parts.append(f"\n" + ("\t" * self._indent))
         for child in tree.children:
             if isinstance(child, Token):
-                 self._parts.append(f"{child.value} ")
+                self._parts.append(f"{child.value} ")
         return True
 
     def _offset_clause_enter(self, tree: Tree, context: dict[str, Any]) -> bool:
@@ -840,7 +840,7 @@ class SparqlSerializer:
         self._parts.append(f"\n" + ("\t" * self._indent))
         for child in tree.children:
             if isinstance(child, Token):
-                 self._parts.append(f"{child.value} ")
+                self._parts.append(f"{child.value} ")
         return True
 
     def _construct_construct_template_enter(

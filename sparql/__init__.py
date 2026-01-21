@@ -65,8 +65,10 @@ def _guess_parser_type(query: str) -> ParserType:
     # But as top-level keywords, they indicate Update.
     # We look for these keywords. If found, we guess 'sparql_update'.
     # A more robust check might skip PREFIX/BASE, but this is just a hint.
-    update_keywords = r"(?i)\b(INSERT|DELETE|LOAD|CLEAR|DROP|ADD|MOVE|COPY|CREATE|WITH)\b"
-    
+    update_keywords = (
+        r"(?i)\b(INSERT|DELETE|LOAD|CLEAR|DROP|ADD|MOVE|COPY|CREATE|WITH)\b"
+    )
+
     # Query keywords
     query_keywords = r"(?i)\b(SELECT|CONSTRUCT|ASK|DESCRIBE)\b"
 
@@ -97,12 +99,14 @@ def validate(query: str, parser_type: Optional[ParserType] = None) -> bool:
             return validate(query, parser_type)
         except SparqlSyntaxError as e:
             # If the guess failed, try the other one
-            other_type: ParserType = "sparql_update" if parser_type == "sparql" else "sparql"
+            other_type: ParserType = (
+                "sparql_update" if parser_type == "sparql" else "sparql"
+            )
             try:
                 return validate(query, other_type)
             except SparqlSyntaxError:
                 # If both fail, raise the error from the guessed type (original attempt)
-                # or maybe the first one makes more sense? 
+                # or maybe the first one makes more sense?
                 # Actually, if the user didn't specify, we usually assume Query implies Query syntax error.
                 # But if it was an Update, we want that error.
                 # Let's raise the error corresponding to the one that matched the structure closest?
@@ -121,7 +125,7 @@ def validate(query: str, parser_type: Optional[ParserType] = None) -> bool:
             return True
         except (LarkError, UnexpectedInput) as e:
             raise _wrap_lark_error(e, "SPARQL update") from e
-    
+
     return False
 
 
@@ -137,8 +141,10 @@ def format_string(query: str) -> str:
     """
     guessed_type = _guess_parser_type(query)
     primary_parser = sparql_parser if guessed_type == "sparql" else sparql_update_parser
-    secondary_parser = sparql_update_parser if guessed_type == "sparql" else sparql_parser
-    
+    secondary_parser = (
+        sparql_update_parser if guessed_type == "sparql" else sparql_parser
+    )
+
     first_error: Optional[Exception] = None
 
     try:

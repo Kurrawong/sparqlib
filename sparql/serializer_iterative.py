@@ -9,7 +9,7 @@ from sparql.serializer_base import (
 )
 
 
-class IterativeSparqlSerializer:
+class SparqlSerializer:
     """An iterative SPARQL serializer that avoids recursion depth issues.
 
     This serializer uses an explicit stack to traverse the SPARQL AST top-down,
@@ -19,9 +19,9 @@ class IterativeSparqlSerializer:
 
     Example:
         >>> from sparql.parser import sparql_parser
-        >>> from sparql.serializer_iterative import IterativeSparqlSerializer
+        >>> from sparql.serializer import SparqlSerializer
         >>> tree = sparql_parser.parse("SELECT * WHERE { ?s ?p ?o }")
-        >>> serializer = IterativeSparqlSerializer()
+        >>> serializer = SparqlSerializer()
         >>> print(serializer.visit_topdown(tree))
     """
 
@@ -34,9 +34,9 @@ class IterativeSparqlSerializer:
             tuple[Union[Tree, Token], TraversalPhase, Optional[TraversalContext]]
         ] = []
         cls = self.__class__
-        if cls not in IterativeSparqlSerializer._handler_cache:
-            IterativeSparqlSerializer._handler_cache[cls] = self._build_handler_map()
-        self._handler_map = IterativeSparqlSerializer._handler_cache[cls]
+        if cls not in SparqlSerializer._handler_cache:
+            SparqlSerializer._handler_cache[cls] = self._build_handler_map()
+        self._handler_map = SparqlSerializer._handler_cache[cls]
 
     @property
     def result(self) -> str:

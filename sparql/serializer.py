@@ -1165,7 +1165,7 @@ class SparqlSerializer(IterativeTreeVisitor):
                         (
                             Token(
                                 "WHERE",
-                                f"\n{self._indent_prefix()}{child.value} ",
+                                f"\n{self._indent_prefix()}{child.value}",
                             ),
                             TraversalPhase.ENTER,
                             context,
@@ -1305,7 +1305,7 @@ class SparqlSerializer(IterativeTreeVisitor):
             if isinstance(child, Token) and child.value.lower() == "union":
                 self._stack.append(
                     (
-                        Token("UNION", f"{self._indent_prefix()}{child.value} "),
+                        Token("UNION", f"{self._indent_prefix()}{child.value}"),
                         TraversalPhase.ENTER,
                         context,
                     )
@@ -1320,7 +1320,7 @@ class SparqlSerializer(IterativeTreeVisitor):
             if isinstance(child, Token) and child.value.lower() == "service":
                 self._stack.append(
                     (
-                        Token("SERVICE", f"{self._indent_prefix()}{child.value} "),
+                        Token("SERVICE", f"{self._indent_prefix()}{child.value}"),
                         TraversalPhase.ENTER,
                         context,
                     )
@@ -1348,7 +1348,7 @@ class SparqlSerializer(IterativeTreeVisitor):
         self._stack.append((Token("RPAR", ") "), TraversalPhase.ENTER, context))
         self._stack.append((var, TraversalPhase.ENTER, context))
         self._stack.append(
-            (Token("AS", f" {as_value} "), TraversalPhase.ENTER, context)
+            (Token("AS", f" {as_value}"), TraversalPhase.ENTER, context)
         )
         self._stack.append((expression, TraversalPhase.ENTER, context))
         return True

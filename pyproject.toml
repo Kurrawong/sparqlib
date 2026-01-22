@@ -24,3 +24,8 @@ select = [
     "I001",
     "I002"
 ]
+
+[tool.pytest.ini_options]
+markers = [
+    "performance: marks tests as performance benchmarks (select with '-m performance')",
+]

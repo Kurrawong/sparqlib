@@ -14,6 +14,10 @@ __all__ = [
     "format_string_explicit",
     "format_query",
     "format_update",
+    "parse",
+    "parse_query",
+    "parse_update",
+    "serialize",
     "validate",
     "validate_query",
     "validate_update",
@@ -69,14 +73,18 @@ def _contains(pattern: str, text: str) -> bool:
 def _remove_noise(text: str) -> str:
     """Remove comments, strings, and IRIs from the query text."""
     # Pattern for removing comments, strings, and IRIs
+    # Order matters: triple-quoted strings must be matched before single-quoted
     # 1. Comments: #.*
-    # 2. Strings: "..." or '...' (handling escaped quotes)
-    # 3. IRIs: <...>
+    # 2. Triple-quoted strings: """...""" or '''...''' (may contain unescaped quotes)
+    # 3. Single-quoted strings: "..." or '...' (handling escaped quotes)
+    # 4. IRIs: <...>
     pattern = r"""
-        \#.*$                     |  # Comments
-        "[^"\\]*(?:\\.[^"\\]*)*"  |  # Double quoted strings
-        '[^'\\]*(?:\\.[^'\\]*)*'  |  # Single quoted strings
-        <[^>]*>                      # IRIs (simplified)
+        \#.*$                              |  # Comments
+        \"\"\"[\s\S]*?\"\"\"               |  # Triple double-quoted strings
+        '''[\s\S]*?'''                     |  # Triple single-quoted strings
+        "[^"\\]*(?:\\.[^"\\]*)*"           |  # Double quoted strings
+        '[^'\\]*(?:\\.[^'\\]*)*'           |  # Single quoted strings
+        <[^>]*>                               # IRIs (simplified)
     """
     return re.sub(pattern, " ", text, flags=re.VERBOSE | re.MULTILINE)
 
@@ -272,3 +280,85 @@ def validate_update(query: str) -> bool:
     :raises SparqlSyntaxError: If the update has a syntax error.
     """
     return validate(query, parser_type="sparql_update")
+
+
+def parse(query: str, parser_type: Optional[ParserType] = None) -> Tree:
+    """Parse a SPARQL query or update and return the AST.
+
+    This function provides direct access to the parsed abstract syntax tree,
+    enabling advanced use cases like query analysis and modification.
+
+    When parser_type is None, a heuristic is used to guess the most likely
+    parser type. If parsing fails, the other parser is tried as a fallback.
+
+    :param query: Input SPARQL query or update string.
+    :param parser_type: Optional parser type. If None, tries both parsers.
+    :return: The parsed AST as a lark.Tree.
+    :raises SparqlSyntaxError: If the query has a syntax error.
+    :raises ValueError: If parser_type is not None, "sparql", or "sparql_update".
+    """
+    if parser_type is None:
+        guessed_type = _guess_parser_type(query)
+        try:
+            return parse(query, guessed_type)
+        except SparqlSyntaxError as e:
+            other_type: ParserType = (
+                "sparql_update" if guessed_type == "sparql" else "sparql"
+            )
+            try:
+                return parse(query, other_type)
+            except SparqlSyntaxError:
+                raise e
+
+    if parser_type == "sparql":
+        try:
+            return sparql_parser.parse(query)
+        except (LarkError, UnexpectedInput) as e:
+            raise _wrap_lark_error(e, "SPARQL query") from e
+    elif parser_type == "sparql_update":
+        try:
+            return sparql_update_parser.parse(query)
+        except (LarkError, UnexpectedInput) as e:
+            raise _wrap_lark_error(e, "SPARQL update") from e
+    else:
+        raise ValueError(
+            f"Unexpected parser type: {parser_type}. Must be one of {ParserType}"
+        )
+
+
+def parse_query(query: str) -> Tree:
+    """Parse a SPARQL query and return the AST.
+
+    This is a convenience function equivalent to parse(query, "sparql").
+
+    :param query: Input SPARQL query string.
+    :return: The parsed AST as a lark.Tree.
+    :raises SparqlSyntaxError: If the query has a syntax error.
+    """
+    return parse(query, parser_type="sparql")
+
+
+def parse_update(query: str) -> Tree:
+    """Parse a SPARQL update and return the AST.
+
+    This is a convenience function equivalent to parse(query, "sparql_update").
+
+    :param query: Input SPARQL update string.
+    :return: The parsed AST as a lark.Tree.
+    :raises SparqlSyntaxError: If the update has a syntax error.
+    """
+    return parse(query, parser_type="sparql_update")
+
+
+def serialize(tree: Tree) -> str:
+    """Serialize a SPARQL AST back to a string.
+
+    This function enables round-tripping: parse a query, modify the AST,
+    then serialize it back to a string.
+
+    :param tree: A lark.Tree representing a parsed SPARQL query or update.
+    :return: The serialized SPARQL string.
+    """
+    serializer = SparqlSerializer()
+    serializer.visit_topdown(tree)
+    return serializer.result

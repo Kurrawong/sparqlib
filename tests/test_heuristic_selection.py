@@ -45,6 +45,33 @@ def test_guess_parser_type_ambiguous():
     assert _guess_parser_type(query_update) == "sparql_update"
 
 
+def test_guess_parser_type_triple_quoted_strings():
+    """Test that keywords inside triple-quoted strings are ignored."""
+    # Triple single-quoted string with INSERT keyword
+    query = "SELECT * WHERE { ?s ?p '''INSERT DELETE''' }"
+    assert _guess_parser_type(query) == "sparql"
+
+    # Triple double-quoted string with INSERT keyword
+    query2 = 'SELECT * WHERE { ?s ?p """INSERT DELETE""" }'
+    assert _guess_parser_type(query2) == "sparql"
+
+    # Triple-quoted string with internal unescaped quotes
+    query3 = "SELECT * WHERE { ?s ?p '''It's INSERT time''' }"
+    assert _guess_parser_type(query3) == "sparql"
+
+    # Update with SELECT in triple-quoted string
+    query4 = "INSERT DATA { <s> <p> '''SELECT CONSTRUCT''' }"
+    assert _guess_parser_type(query4) == "sparql_update"
+
+    # Multi-line triple-quoted string with keywords
+    query5 = '''SELECT * WHERE { ?s ?p """
+        INSERT
+        DELETE
+        DROP
+    """ }'''
+    assert _guess_parser_type(query5) == "sparql"
+
+
 def test_format_string_uses_heuristic_success():
     """Test that format_string uses the heuristic and succeeds."""
     query = "INSERT DATA { <s> <p> <o> }"

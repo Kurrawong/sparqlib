@@ -28,6 +28,7 @@ class TraversalContext(TypedDict, total=False):
     """Context passed to tree handlers during traversal."""
 
     indent_inc: bool
+    no_space_after: bool
 
 
 def _safe_get_child(
@@ -164,38 +165,42 @@ def get_vars(vars_: list[Tree]) -> str:
     return " ".join(get_var(var) for var in vars_)
 
 
-class SparqlSerializer:
-    """An iterative SPARQL serializer that avoids recursion depth issues.
+class IterativeTreeVisitor:
+    """A generic iterative tree visitor that avoids recursion depth issues.
 
-    This serializer uses an explicit stack to traverse the SPARQL AST top-down,
-    eliminating the risk of RecursionError for deeply nested queries. It maintains
-    exact output parity with the original recursive serializer while supporting
-    arbitrarily complex structures.
+    This base class provides an explicit stack-based traversal engine for Lark
+    parse trees, eliminating the risk of RecursionError for deeply nested structures.
 
-    Example:
-        >>> from sparql.parser import sparql_parser
-        >>> from sparql.serializer import SparqlSerializer
-        >>> tree = sparql_parser.parse("SELECT * WHERE { ?s ?p ?o }")
-        >>> serializer = SparqlSerializer()
-        >>> print(serializer.visit_topdown(tree))
+    Subclasses should:
+    1. Override `_build_handler_map()` to define handlers for specific node types
+    2. Optionally override `_handle_token()` to customize token processing
+
+    The visitor supports both ENTER and EXIT phases for each node, allowing
+    pre-order and post-order processing logic.
     """
 
     _handler_cache: dict[type, dict[str, TreeHandler]] = {}
 
+    # Tokens that should not have a space before them
+    _NO_SPACE_BEFORE: frozenset[str] = frozenset((")", "]", "}", ",", ";", "(", "["))
+    # Tokens that should not have a space after them
+    _NO_SPACE_AFTER: frozenset[str] = frozenset(("(", "["))
+
     def __init__(self):
         self._parts: list[str] = []
         self._indent: int = 0
+        self._no_space_after: bool = False  # State flag for space suppression
         self._stack: list[
             tuple[Union[Tree, Token], TraversalPhase, Optional[TraversalContext]]
         ] = []
         cls = self.__class__
-        if cls not in SparqlSerializer._handler_cache:
-            SparqlSerializer._handler_cache[cls] = self._build_handler_map()
-        self._handler_map = SparqlSerializer._handler_cache[cls]
+        if cls not in IterativeTreeVisitor._handler_cache:
+            IterativeTreeVisitor._handler_cache[cls] = self._build_handler_map()
+        self._handler_map = IterativeTreeVisitor._handler_cache[cls]
 
     @property
     def result(self) -> str:
-        """Returns the serialized SPARQL query as a string."""
+        """Returns the serialized result as a string."""
         return "".join(self._parts)
 
     def visit_topdown(self, tree: Tree) -> str:
@@ -205,10 +210,11 @@ class SparqlSerializer:
             tree: The Lark Tree to serialize.
 
         Returns:
-            The serialized SPARQL query string.
+            The serialized string.
         """
         self._parts = []
         self._indent = 0
+        self._no_space_after = False
         self._stack = [(tree, TraversalPhase.ENTER, None)]
 
         while self._stack:
@@ -221,19 +227,14 @@ class SparqlSerializer:
         return self.result
 
     def _last_char(self) -> Optional[str]:
+        """Returns the last non-empty character in the output buffer."""
         for part in reversed(self._parts):
             if part:
                 return part[-1]
         return None
 
-    def _raw_token_value(self, value: str) -> str:
-        if value in ("(", ")"):
-            return value
-        if value == ",":
-            return ", "
-        return f"{value} "
-
     def _trim_trailing_space(self) -> None:
+        """Removes trailing spaces from the last non-empty part."""
         for i in range(len(self._parts) - 1, -1, -1):
             part = self._parts[i]
             if part:
@@ -265,29 +266,93 @@ class SparqlSerializer:
                 handler["exit"](self, node, context or {})
 
     def _handle_token(self, token: Token) -> None:
-        """Handles a Token by appending its value to the result parts."""
+        """Handles a Token by appending its value to the result parts.
+
+        Uses state-aware spacing logic:
+        - `_no_space_after` flag prevents trailing space when set by previous token
+        - Tokens in `_NO_SPACE_BEFORE` never have a space before them
+        - Tokens in `_NO_SPACE_AFTER` set the flag for the next token
+
+        Subclasses may override this method to customize token handling.
+        """
         if token.type == "DOT_NEWLINE":
+            self._no_space_after = False
             self._parts.append(token.value)
         elif token.type == "SPACE":
+            if self._no_space_after:
+                return
             last_char = self._last_char()
-            if last_char is None or last_char.isspace() or last_char in ("(", "["):
+            if last_char is None or last_char.isspace() or last_char in self._NO_SPACE_AFTER:
                 return
             self._parts.append(" ")
         elif token.type == "RAW":
-            if token.value and token.value[0] in (")", "]", "}", ",", ";", "(", "["):
+            first_char = token.value[0] if token.value else ""
+            if first_char in self._NO_SPACE_BEFORE:
                 self._trim_trailing_space()
+            self._no_space_after = False
             self._parts.append(token.value)
         else:
-            if token.value and token.value[0] in (")", "]", "}", ",", ";", "(", "["):
+            first_char = token.value[0] if token.value else ""
+            should_suppress_leading_space = first_char in self._NO_SPACE_BEFORE
+
+            if should_suppress_leading_space:
                 self._trim_trailing_space()
+
             self._parts.append(token.value)
-            if token.value not in ("(", "["):
+
+            if token.value in self._NO_SPACE_AFTER:
+                self._no_space_after = True
+            else:
+                self._no_space_after = False
                 self._parts.append(" ")
+
+    def _build_handler_map(self) -> dict[str, dict[str, Any]]:
+        """Builds a map of tree node types to their respective handlers.
+
+        Subclasses should override this method to define handlers for their
+        specific grammar rules.
+
+        Returns:
+            A dictionary mapping node type names to handler dictionaries with
+            'enter' and 'exit' keys.
+        """
+        return {}
+
+
+class SparqlSerializer(IterativeTreeVisitor):
+    """An iterative SPARQL serializer that avoids recursion depth issues.
+
+    This serializer extends IterativeTreeVisitor with SPARQL-specific formatting
+    rules. It maintains exact output parity with the original recursive serializer
+    while supporting arbitrarily complex structures.
+
+    Example:
+        >>> from sparql.parser import sparql_parser
+        >>> from sparql.serializer import SparqlSerializer
+        >>> tree = sparql_parser.parse("SELECT * WHERE { ?s ?p ?o }")
+        >>> serializer = SparqlSerializer()
+        >>> print(serializer.visit_topdown(tree))
+    """
+
+    def _raw_token_value(self, value: str) -> str:
+        """Converts a token value to a string with appropriate spacing."""
+        if value in ("(", ")"):
+            return value
+        if value == ",":
+            return ", "
+        return f"{value} "
 
     def _build_handler_map(self) -> dict[str, dict[str, Any]]:
         """Builds a map of tree node types to their respective handlers (unbound methods).
 
         Subclasses can override this method to add or modify handlers.
+
+        Note: Grammar rules not listed here use the default behavior (traverse
+        children and emit tokens). This is intentional for:
+        - Simple pass-through rules (base_decl, prefix_decl, source_selector, etc.)
+        - Sub-rules handled by parent handlers (numeric_literal_*, true, false)
+        - Expression sub-rules (numeric_expression_equals, etc.) which are
+          children of rules that already have handlers
         """
         cls = self.__class__
         return {

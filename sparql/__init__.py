@@ -66,67 +66,94 @@ def _wrap_lark_error(error: Exception, parser_type: str) -> SparqlSyntaxError:
     return SparqlSyntaxError(message, line, column, error)
 
 
-def _contains(pattern: str, text: str) -> bool:
-    return True if re.search(pattern, text, re.IGNORECASE) is not None else False
+# Keywords that indicate the query type (case-insensitive)
+_QUERY_KEYWORDS: frozenset[str] = frozenset(
+    {"select", "construct", "ask", "describe"}
+)
+_UPDATE_KEYWORDS: frozenset[str] = frozenset(
+    {"insert", "delete", "load", "clear", "drop", "add", "move", "copy", "create", "with"}
+)
+_PROLOGUE_KEYWORDS: frozenset[str] = frozenset({"prefix", "base"})
 
-
-def _remove_noise(text: str) -> str:
-    """Remove comments, strings, and IRIs from the query text."""
-    # Pattern for removing comments, strings, and IRIs
-    # Order matters: triple-quoted strings must be matched before single-quoted
-    # 1. Comments: #.*
-    # 2. Triple-quoted strings: """...""" or '''...''' (may contain unescaped quotes)
-    # 3. Single-quoted strings: "..." or '...' (handling escaped quotes)
-    # 4. IRIs: <...>
-    pattern = r"""
-        \#.*$                              |  # Comments
-        \"\"\"[\s\S]*?\"\"\"               |  # Triple double-quoted strings
-        '''[\s\S]*?'''                     |  # Triple single-quoted strings
-        "[^"\\]*(?:\\.[^"\\]*)*"           |  # Double quoted strings
-        '[^'\\]*(?:\\.[^'\\]*)*'           |  # Single quoted strings
-        <[^>\\s]*>                               # IRIs (simplified)
-    """
-    return re.sub(pattern, " ", text, flags=re.VERBOSE | re.MULTILINE)
+# Pattern to tokenize the beginning of a SPARQL query for fast keyword detection
+# Matches: comments, IRIs, prefixed names, keywords/identifiers, or skippable chars
+_TOKEN_PATTERN = re.compile(
+    r"""
+    \#[^\n]*                           |  # Comments (skip to end of line)
+    <[^>]*>                            |  # IRIs
+    [A-Za-z_][A-Za-z0-9_]*:[A-Za-z0-9_]*  |  # Prefixed names (skip)
+    [A-Za-z_][A-Za-z0-9_]*             |  # Keywords/identifiers
+    \s+                                |  # Whitespace
+    .                                     # Any other character
+    """,
+    re.VERBOSE | re.IGNORECASE,
+)
 
 
 def _guess_parser_type(query: str) -> ParserType:
-    """Guess the parser type based on keywords in the query.
+    """Guess the parser type based on the first significant keyword.
 
-    This is a heuristic to improve performance by trying the most likely
-    parser first. It is not guaranteed to be correct.
+    This is an optimized heuristic that scans for the first query/update
+    keyword after any PREFIX/BASE declarations, without processing the
+    entire query string.
+
+    Args:
+        query: The SPARQL query string.
+
+    Returns:
+        'sparql' for SELECT/CONSTRUCT/ASK/DESCRIBE queries,
+        'sparql_update' for INSERT/DELETE/LOAD/etc update operations.
     """
-    clean_query = _remove_noise(query)
+    for match in _TOKEN_PATTERN.finditer(query):
+        token = match.group()
 
-    # specific keywords that strongly suggest an UPDATE query
-    # Note: INSERT/DELETE can occur in CONSTRUCT/subqueries (though usually as 'INSERT DATA' etc for updates)
-    # But as top-level keywords, they indicate Update.
-    # We look for these keywords. If found, we guess 'sparql_update'.
-    # A more robust check might skip PREFIX/BASE, but this is just a hint.
-    update_keywords = r"(?<![?$:])\b(INSERT|DELETE|LOAD|CLEAR|DROP|ADD|MOVE|COPY|CREATE|WITH)\b"
+        # Skip whitespace and comments
+        if not token.strip() or token.startswith("#"):
+            continue
 
-    # Query keywords
-    query_keywords = r"(?<![?$:])\b(SELECT|CONSTRUCT|ASK|DESCRIBE)\b"
+        # Skip IRIs and prefixed names
+        if token.startswith("<") or ":" in token:
+            continue
 
-    has_update = _contains(update_keywords, clean_query)
-    has_query = _contains(query_keywords, clean_query)
+        token_lower = token.lower()
 
-    if has_update and not has_query:
-        return "sparql_update"
-    # Default to sparql (Query) as it's the most common case, or if ambiguous
+        # Skip prologue keywords (PREFIX, BASE)
+        if token_lower in _PROLOGUE_KEYWORDS:
+            continue
+
+        # Check if it's a query or update keyword
+        if token_lower in _QUERY_KEYWORDS:
+            return "sparql"
+        if token_lower in _UPDATE_KEYWORDS:
+            return "sparql_update"
+
+        # Unknown keyword - could be part of a prefixed name or something else
+        # Continue scanning
+        continue
+
+    # Default to query parser if no keywords found
     return "sparql"
 
 
-def validate(query: str, parser_type: Optional[ParserType] = None) -> bool:
+def validate(
+    query: str,
+    parser_type: Optional[ParserType] = None,
+    *,
+    strict: bool = False,
+) -> bool:
     """Validate a SPARQL query without serializing it.
 
     This is faster than format_string when you only need to check validity.
 
     When parser_type is None, a heuristic is used to guess the most likely
-    parser type. If parsing fails, the other parser is tried as a fallback.
-    If both parsers fail, the error from the initially guessed parser is raised.
+    parser type. If parsing fails, the other parser is tried as a fallback
+    (unless strict=True). If both parsers fail, the error from the initially
+    guessed parser is raised.
 
     :param query: Input query string.
-    :param parser_type: Optional parser type. If None, tries both parsers.
+    :param parser_type: Optional parser type. If provided, only that parser is used.
+    :param strict: If True, do not fall back to the secondary parser when the
+        guessed parser fails.
     :return: True if the query is valid.
     :raises SparqlSyntaxError: If the query has a syntax error.
     :raises ValueError: If parser_type is not None, "sparql", or "sparql_update".
@@ -136,6 +163,8 @@ def validate(query: str, parser_type: Optional[ParserType] = None) -> bool:
         try:
             return validate(query, guessed_type)
         except SparqlSyntaxError as e:
+            if strict:
+                raise
             other_type: ParserType = (
                 "sparql_update" if guessed_type == "sparql" else "sparql"
             )
@@ -162,14 +191,23 @@ def validate(query: str, parser_type: Optional[ParserType] = None) -> bool:
         )
 
 
-def format_string(query: str, parser_type: Optional[ParserType] = None) -> str:
+def format_string(
+    query: str,
+    parser_type: Optional[ParserType] = None,
+    *,
+    strict: bool = False,
+) -> str:
     """Parse the input string and return a formatted version of it.
 
     It first attempts to parse the query based on a heuristic guess,
-    falling back to the other parser if the first fails.
+    falling back to the other parser if the first fails (unless strict=True).
 
     :param query: Input query string.
-    :param parser_type: Optional parser type. If provided, the heuristic is skipped.
+    :param parser_type: Optional parser type. If provided, the heuristic is skipped
+        and only that parser is used.
+    :param strict: If True, do not fall back to the secondary parser when the
+        guessed parser fails. This avoids the double-parsing cost for ambiguous
+        queries but will fail if the heuristic guesses wrong.
     :return: Formatted query.
     :raises SparqlSyntaxError: If the query has a syntax error.
     """
@@ -178,11 +216,7 @@ def format_string(query: str, parser_type: Optional[ParserType] = None) -> str:
 
     guessed_type = _guess_parser_type(query)
     primary_parser = sparql_parser if guessed_type == "sparql" else sparql_update_parser
-    secondary_parser = (
-        sparql_update_parser if guessed_type == "sparql" else sparql_parser
-    )
-
-    first_error: Optional[Exception] = None
+    context = "query" if guessed_type == "sparql" else "update"
 
     try:
         tree = primary_parser.parse(query)
@@ -190,7 +224,14 @@ def format_string(query: str, parser_type: Optional[ParserType] = None) -> str:
         serializer.visit_topdown(tree)
         return serializer.result
     except (LarkError, UnexpectedInput) as e:
+        if strict:
+            raise _wrap_lark_error(e, f"SPARQL {context}") from e
         first_error = e
+
+    # Fallback to secondary parser
+    secondary_parser = (
+        sparql_update_parser if guessed_type == "sparql" else sparql_parser
+    )
 
     try:
         tree = secondary_parser.parse(query)
@@ -199,7 +240,6 @@ def format_string(query: str, parser_type: Optional[ParserType] = None) -> str:
         return serializer.result
     except (LarkError, UnexpectedInput):
         # Raise error for the primary guess type, as it was the most likely intent
-        context = "query" if guessed_type == "sparql" else "update"
         raise _wrap_lark_error(first_error, f"SPARQL {context}") from first_error
 
 

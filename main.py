@@ -1,4 +1,4 @@
-from sparql import format_string
+from sparql import format_string, normalize_keyword_tokens
 from sparql.parser import sparql_parser
 from sparql.serializer import SparqlSerializer
 
@@ -25,5 +25,7 @@ print(f"\nNew query:\n{formatted}")
 
 # Parse back to verify
 new_tree = sparql_parser.parse(formatted)
-print(f"\nQuery is the same: {tree == new_tree}")
-assert tree == new_tree
+normalized_tree = normalize_keyword_tokens(tree)
+normalized_new_tree = normalize_keyword_tokens(new_tree)
+print(f"\nQuery is the same: {normalized_tree == normalized_new_tree}")
+assert normalized_tree == normalized_new_tree

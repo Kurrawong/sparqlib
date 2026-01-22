@@ -1,7 +1,7 @@
 import re
 from typing import Literal, Optional
 
-from lark import Tree
+from lark import Token, Tree
 from lark.exceptions import LarkError, UnexpectedInput
 
 from sparql.parser import sparql_parser, sparql_update_parser
@@ -18,6 +18,7 @@ __all__ = [
     "parse_query",
     "parse_update",
     "serialize",
+    "normalize_keyword_tokens",
     "validate",
     "validate_query",
     "validate_update",
@@ -64,6 +65,31 @@ def _wrap_lark_error(error: Exception, parser_type: str) -> SparqlSyntaxError:
     column = getattr(error, "column", None)
     message = f"Failed to parse as {parser_type}: {error}"
     return SparqlSyntaxError(message, line, column, error)
+
+
+def normalize_keyword_tokens(
+    node: Tree | Token, keyword_set: frozenset[str] | None = None
+) -> Tree | Token:
+    """Normalize SPARQL keyword token values to uppercase in a Lark tree."""
+    if keyword_set is None:
+        keyword_set = SparqlSerializer.KEYWORDS
+    if isinstance(node, Token):
+        value = node.value
+        stripped = value.strip()
+        if stripped and stripped.upper() in keyword_set:
+            leading = value[: len(value) - len(value.lstrip())]
+            trailing = value[len(value.rstrip()) :]
+            return Token(node.type, f"{leading}{stripped.upper()}{trailing}")
+        return node
+    if isinstance(node, Tree):
+        return Tree(
+            node.data,
+            [
+                normalize_keyword_tokens(child, keyword_set)
+                for child in node.children
+            ],
+        )
+    return node
 
 
 # Keywords that indicate the query type (case-insensitive)

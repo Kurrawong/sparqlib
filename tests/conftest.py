@@ -3,6 +3,7 @@ from pathlib import Path
 import lark
 import pytest
 
+from sparql import normalize_keyword_tokens
 from sparql.parser import sparql_parser, sparql_update_parser
 from sparql.serializer import SparqlSerializer
 
@@ -29,6 +30,8 @@ def test_roundtrip():
             sparql_serializer.visit_topdown(tree)
 
             new_tree = parser.parse(sparql_serializer.result)
-            assert tree == new_tree
+            normalized_tree = normalize_keyword_tokens(tree)
+            normalized_new_tree = normalize_keyword_tokens(new_tree)
+            assert normalized_tree == normalized_new_tree
 
     return _test_roundtrip

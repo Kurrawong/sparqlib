@@ -9,15 +9,15 @@ def test_serializer_opinionated_formatting():
     )
 
     expected = (
-        "prefix ex: <http://www.example.org/schema#>\n"
-        "prefix in: <http://www.example.org/instance#>\n"
+        "PREFIX ex: <http://www.example.org/schema#>\n"
+        "PREFIX in: <http://www.example.org/instance#>\n"
         "\n"
-        "select ?x\n"
-        "where {\n"
-        "    graph ?g {\n"
+        "SELECT ?x\n"
+        "WHERE {\n"
+        "    GRAPH ?g {\n"
         "        {\n"
-        "            select ?x\n"
-        "            where {\n"
+        "            SELECT ?x\n"
+        "            WHERE {\n"
         "                ?x ?p  ?g\n"
         "            }\n"
         "        }\n"

@@ -289,6 +289,8 @@ class IterativeTreeVisitor:
             first_char = token.value[0] if token.value else ""
             if first_char in self._NO_SPACE_BEFORE:
                 self._trim_trailing_space()
+            if token.value.startswith("\n"):
+                self._trim_trailing_space()
             self._no_space_after = False
             self._parts.append(token.value)
         else:
@@ -333,6 +335,22 @@ class SparqlSerializer(IterativeTreeVisitor):
         >>> serializer = SparqlSerializer()
         >>> print(serializer.visit_topdown(tree))
     """
+
+    INDENT_STR = "    "
+
+    def _indent_prefix(self, extra: int = 0) -> str:
+        return self.INDENT_STR * (self._indent + extra)
+
+    def _at_line_start(self) -> bool:
+        if not self._parts:
+            return True
+        return self._parts[-1].endswith("\n")
+
+    def _open_brace(self) -> None:
+        if self._at_line_start():
+            self._parts.append(f"{self._indent_prefix()}{{\n")
+        else:
+            self._parts.append("{\n")
 
     def _raw_token_value(self, value: str) -> str:
         """Converts a token value to a string with appropriate spacing."""
@@ -667,7 +685,7 @@ class SparqlSerializer(IterativeTreeVisitor):
         return False
 
     def _quad_data_enter(self, tree: Tree, context: dict[str, Any]) -> bool:
-        self._parts.append("{\n")
+        self._open_brace()
         self._indent += 1
         # Robustly find the child to traverse (the ones inside braces)
         # Assuming structure: LEFT_CURLY_BRACE quads RIGHT_CURLY_BRACE
@@ -679,10 +697,11 @@ class SparqlSerializer(IterativeTreeVisitor):
 
     def _quad_data_exit(self, tree: Tree, context: dict[str, Any]) -> None:
         self._indent -= 1
-        self._parts.append(f"\n{'\t' * self._indent}}}")
+        self._trim_trailing_space()
+        self._parts.append(f"\n{self._indent_prefix()}}}")
 
     def _quad_pattern_enter(self, tree: Tree, context: dict[str, Any]) -> bool:
-        self._parts.append("{\n")
+        self._open_brace()
         self._indent += 1
         # Robustly find 'quads'
         quads = self._safe_get_child_by_type(tree, "quads")
@@ -692,7 +711,8 @@ class SparqlSerializer(IterativeTreeVisitor):
 
     def _quad_pattern_exit(self, tree: Tree, context: dict[str, Any]) -> None:
         self._indent -= 1
-        self._parts.append(f"\n{'\t' * self._indent}}}")
+        self._trim_trailing_space()
+        self._parts.append(f"\n{self._indent_prefix()}}}")
 
     def _quads_not_triples_enter(self, tree: Tree, context: dict[str, Any]) -> bool:
         """Handles quads that are not triples, manually injecting braces and indentation.
@@ -710,7 +730,7 @@ class SparqlSerializer(IterativeTreeVisitor):
                 elif child.value == "}":
                     self._stack.append(
                         (
-                            Token("RAW", f"\n{'\t' * self._indent}}}"),
+                            Token("RAW", f"\n{self._indent_prefix()}}}"),
                             TraversalPhase.ENTER,
                             context,
                         )
@@ -826,7 +846,7 @@ class SparqlSerializer(IterativeTreeVisitor):
             if token.value.lower() == "select":
                 self._stack.append(
                     (
-                        Token("SELECT", ("\t" * self._indent) + token.value),
+                        Token("SELECT", self._indent_prefix() + token.value),
                         TraversalPhase.ENTER,
                         context,
                     )
@@ -839,7 +859,8 @@ class SparqlSerializer(IterativeTreeVisitor):
     def _where_clause_enter(self, tree: Tree, context: dict[str, Any]) -> bool:
         where_token = self._find_token(tree, "WHERE")
         if where_token:
-            self._parts.append(f"\n" + ("\t" * self._indent) + f"{where_token.value} ")
+            self._trim_trailing_space()
+            self._parts.append(f"\n{self._indent_prefix()}{where_token.value} ")
 
         # Traverse any children that are Trees (graph pattern)
         # Note: if there is a where token, the pattern is usually next, but we just traverse all children
@@ -870,6 +891,7 @@ class SparqlSerializer(IterativeTreeVisitor):
         return True
 
     def _dataset_clause_exit(self, tree: Tree, context: dict[str, Any]) -> None:
+        self._trim_trailing_space()
         self._parts.append("\n")
 
     def _group_clause_enter(self, tree: Tree, context: dict[str, Any]) -> bool:
@@ -882,7 +904,7 @@ class SparqlSerializer(IterativeTreeVisitor):
         if by_token:
             prefix += f"{by_token.value} "
 
-        self._parts.append(("\t" * self._indent) + prefix)
+        self._parts.append(self._indent_prefix() + prefix)
 
         # Traverse children in reverse order, excluding keywords
         for i in range(len(tree.children) - 1, -1, -1):
@@ -894,7 +916,8 @@ class SparqlSerializer(IterativeTreeVisitor):
     def _having_clause_enter(self, tree: Tree, context: dict[str, Any]) -> bool:
         having_token = self._find_token(tree, "HAVING")
         if having_token:
-            self._parts.append(f"\n" + ("\t" * self._indent) + f"{having_token.value} ")
+            self._trim_trailing_space()
+            self._parts.append(f"\n{self._indent_prefix()}{having_token.value} ")
 
         for i in range(len(tree.children) - 1, -1, -1):
             child = tree.children[i]
@@ -912,7 +935,8 @@ class SparqlSerializer(IterativeTreeVisitor):
         if by_token:
             prefix += f"{by_token.value} "
 
-        self._parts.append(f"\n" + ("\t" * self._indent) + prefix)
+        self._trim_trailing_space()
+        self._parts.append(f"\n{self._indent_prefix()}{prefix}")
 
         for i in range(len(tree.children) - 1, -1, -1):
             child = tree.children[i]
@@ -927,7 +951,8 @@ class SparqlSerializer(IterativeTreeVisitor):
         # So we have 2 children: Token(LIMIT), Token(INTEGER)
 
         # We can just append all children values since they are tokens
-        self._parts.append(f"\n" + ("\t" * self._indent))
+        self._trim_trailing_space()
+        self._parts.append(f"\n{self._indent_prefix()}")
         for child in tree.children:
             if isinstance(child, Token):
                 self._parts.append(f"{child.value} ")
@@ -935,7 +960,8 @@ class SparqlSerializer(IterativeTreeVisitor):
 
     def _offset_clause_enter(self, tree: Tree, context: dict[str, Any]) -> bool:
         # Same as limit: /OFFSET/i INTEGER
-        self._parts.append(f"\n" + ("\t" * self._indent))
+        self._trim_trailing_space()
+        self._parts.append(f"\n{self._indent_prefix()}")
         for child in tree.children:
             if isinstance(child, Token):
                 self._parts.append(f"{child.value} ")
@@ -965,7 +991,7 @@ class SparqlSerializer(IterativeTreeVisitor):
                         (
                             Token(
                                 "WHERE",
-                                f"\n" + ("\t" * self._indent) + child.value + " ",
+                                f"\n{self._indent_prefix()}{child.value} ",
                             ),
                             TraversalPhase.ENTER,
                             context,
@@ -978,7 +1004,7 @@ class SparqlSerializer(IterativeTreeVisitor):
                     # Manually add braces and indentation around triples_template
                     self._stack.append(
                         (
-                            Token("RAW", f"\n{'\t' * self._indent}}}"),
+                            Token("RAW", f"\n{self._indent_prefix()}}}"),
                             TraversalPhase.ENTER,
                             context,
                         )
@@ -1022,7 +1048,8 @@ class SparqlSerializer(IterativeTreeVisitor):
 
     def _construct_template_exit(self, tree: Tree, context: dict[str, Any]) -> None:
         self._indent -= 1
-        self._parts.append(f"\n" + ("\t" * self._indent) + "}")
+        self._trim_trailing_space()
+        self._parts.append(f"\n{self._indent_prefix()}}}")
 
     def _construct_triples_enter(self, tree: Tree, context: dict[str, Any]) -> bool:
         self._stack.append((tree, TraversalPhase.EXIT, context))
@@ -1035,22 +1062,25 @@ class SparqlSerializer(IterativeTreeVisitor):
         return True
 
     def _group_graph_pattern_enter(self, tree: Tree, context: dict[str, Any]) -> None:
-        self._parts.append(f"{'	' * self._indent}{{\n")
+        self._open_brace()
         self._indent += 1
 
     def _group_graph_pattern_exit(self, tree: Tree, context: dict[str, Any]) -> None:
         self._indent -= 1
-        self._parts.append(f"\n{'	' * self._indent}}}")
+        self._trim_trailing_space()
+        self._parts.append(f"\n{self._indent_prefix()}}}")
 
     def _group_graph_pattern_sub_other_enter(
         self, tree: Tree, context: dict[str, Any]
     ) -> bool:
-        self._parts.append("\n")
+        if not self._at_line_start():
+            self._trim_trailing_space()
+            self._parts.append("\n")
         for child in reversed(tree.children):
             if isinstance(child, Token) and child.type == "DOT":
                 self._stack.append(
                     (
-                        Token("DOT_NEWLINE", f"{'	' * self._indent}.\n"),
+                        Token("DOT_NEWLINE", f"{self._indent_prefix()}.\n"),
                         TraversalPhase.ENTER,
                         context,
                     )
@@ -1073,19 +1103,19 @@ class SparqlSerializer(IterativeTreeVisitor):
         self, tree: Tree, context: dict[str, Any]
     ) -> bool:
         optional_token = tree.children[0]
-        self._parts.append(f"{'	' * self._indent}{optional_token.value} ")
+        self._parts.append(f"{self._indent_prefix()}{optional_token.value} ")
         self._stack.append((tree.children[1], TraversalPhase.ENTER, context))
         return True
 
     def _minus_graph_pattern_enter(self, tree: Tree, context: dict[str, Any]) -> bool:
         minus_token = tree.children[0]
-        self._parts.append(f"{'	' * self._indent}{minus_token.value} ")
+        self._parts.append(f"{self._indent_prefix()}{minus_token.value} ")
         self._stack.append((tree.children[1], TraversalPhase.ENTER, context))
         return True
 
     def _graph_graph_pattern_enter(self, tree: Tree, context: dict[str, Any]) -> bool:
         graph_token = tree.children[0]
-        self._parts.append(f"{'	' * self._indent}{graph_token.value} ")
+        self._parts.append(f"{self._indent_prefix()}{graph_token.value} ")
         self._stack.append((tree.children[2], TraversalPhase.ENTER, context))
         self._stack.append((tree.children[1], TraversalPhase.ENTER, context))
         return True
@@ -1098,7 +1128,7 @@ class SparqlSerializer(IterativeTreeVisitor):
             if isinstance(child, Token) and child.value.lower() == "union":
                 self._stack.append(
                     (
-                        Token("UNION", f"{'	' * self._indent}{child.value} "),
+                        Token("UNION", f"{self._indent_prefix()}{child.value} "),
                         TraversalPhase.ENTER,
                         context,
                     )
@@ -1113,7 +1143,7 @@ class SparqlSerializer(IterativeTreeVisitor):
             if isinstance(child, Token) and child.value.lower() == "service":
                 self._stack.append(
                     (
-                        Token("SERVICE", f"{'	' * self._indent}{child.value} "),
+                        Token("SERVICE", f"{self._indent_prefix()}{child.value} "),
                         TraversalPhase.ENTER,
                         context,
                     )
@@ -1124,7 +1154,7 @@ class SparqlSerializer(IterativeTreeVisitor):
 
     def _filter_enter(self, tree: Tree, context: dict[str, Any]) -> bool:
         filter_token = tree.children[0]
-        self._parts.append(f"{'	' * self._indent}{filter_token.value} ")
+        self._parts.append(f"{self._indent_prefix()}{filter_token.value} ")
         self._stack.append((tree.children[1], TraversalPhase.ENTER, context))
         return True
 
@@ -1134,7 +1164,7 @@ class SparqlSerializer(IterativeTreeVisitor):
         as_token = _safe_get_child(tree, 2, Token, "bind")
         var = _safe_get_child(tree, 3, Tree, "bind.var")
 
-        self._parts.append(f"{'	' * self._indent}{bind_token.value} (")
+        self._parts.append(f"{self._indent_prefix()}{bind_token.value} (")
         self._stack.append((Token("RPAR", ") "), TraversalPhase.ENTER, context))
         self._stack.append((var, TraversalPhase.ENTER, context))
         self._stack.append(
@@ -1145,7 +1175,7 @@ class SparqlSerializer(IterativeTreeVisitor):
 
     def _inline_data_enter(self, tree: Tree, context: dict[str, Any]) -> bool:
         values_token = tree.children[0]
-        self._parts.append(f"{'	' * self._indent}{values_token.value} ")
+        self._parts.append(f"{self._indent_prefix()}{values_token.value} ")
         self._stack.append((tree.children[1], TraversalPhase.ENTER, context))
         return True
 
@@ -1158,13 +1188,13 @@ class SparqlSerializer(IterativeTreeVisitor):
         return True
 
     def _triples_same_subject_enter(self, tree: Tree, context: dict[str, Any]) -> bool:
-        self._parts.append("\t" * self._indent)
+        self._parts.append(self._indent_prefix())
         return False
 
     def _triples_same_subject_path_enter(
         self, tree: Tree, context: dict[str, Any]
     ) -> bool:
-        self._parts.append("\t" * self._indent)
+        self._parts.append(self._indent_prefix())
         return False
 
     def _triples_template_enter(self, tree: Tree, context: dict[str, Any]) -> bool:
@@ -1195,7 +1225,7 @@ class SparqlSerializer(IterativeTreeVisitor):
     def _property_list_path_not_empty_other_enter(
         self, tree: Tree, context: dict[str, Any]
     ) -> bool:
-        self._parts.append(f";\n{'	' * (self._indent + 1)}")
+        self._parts.append(f";\n{self._indent_prefix(1)}")
         return False
 
     def _verb_enter(self, tree: Tree, context: dict[str, Any]) -> bool:
@@ -1536,7 +1566,7 @@ class SparqlSerializer(IterativeTreeVisitor):
 
     def _exists_func_enter(self, tree: Tree, context: dict[str, Any]) -> bool:
         exists_token = tree.children[0]
-        self._parts.append(f"{'	' * self._indent}{exists_token.value}")
+        self._parts.append(f"{self._indent_prefix()}{exists_token.value}")
         self._stack.append((tree.children[1], TraversalPhase.ENTER, context))
         return True
 
@@ -1544,7 +1574,7 @@ class SparqlSerializer(IterativeTreeVisitor):
         not_token = tree.children[0]
         exists_token = tree.children[1]
         self._parts.append(
-            f"{'	' * self._indent}{not_token.value} {exists_token.value}"
+            f"{self._indent_prefix()}{not_token.value} {exists_token.value}"
         )
         self._stack.append((tree.children[2], TraversalPhase.ENTER, context))
         return True
@@ -1685,7 +1715,7 @@ class SparqlSerializer(IterativeTreeVisitor):
                 elif child.value == "}":
                     self._stack.append(
                         (
-                            Token("RAW", f"\n{'	' * self._indent}}}"),
+                            Token("RAW", f"\n{self._indent_prefix()}}}"),
                             TraversalPhase.ENTER,
                             context,
                         )
@@ -1694,7 +1724,7 @@ class SparqlSerializer(IterativeTreeVisitor):
                 self._stack.append((child, TraversalPhase.ENTER, context))
                 self._stack.append(
                     (
-                        Token("RAW", f"{'	' * (self._indent + 1)}"),
+                        Token("RAW", f"{self._indent_prefix(1)}"),
                         TraversalPhase.ENTER,
                         context,
                     )
@@ -1721,7 +1751,7 @@ class SparqlSerializer(IterativeTreeVisitor):
                 elif child.value == "}":
                     self._stack.append(
                         (
-                            Token("RAW", f"{'	' * self._indent}}}"),
+                            Token("RAW", f"{self._indent_prefix()}}}"),
                             TraversalPhase.ENTER,
                             context,
                         )
@@ -1747,7 +1777,7 @@ class SparqlSerializer(IterativeTreeVisitor):
     def _data_block_value_group_enter(
         self, tree: Tree, context: dict[str, Any]
     ) -> bool:
-        self._parts.append(f"{'	' * (self._indent + 1)}")
+        self._parts.append(self._indent_prefix(1))
         for i in range(len(tree.children) - 1, -1, -1):
             child = tree.children[i]
             if isinstance(child, Token):

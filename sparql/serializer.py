@@ -454,6 +454,160 @@ class SparqlSerializer(IterativeTreeVisitor):
         }
     )
 
+    def __init__(self, preserve_comments: bool = True):
+        super().__init__()
+        self._preserve_comments: bool = preserve_comments
+        self._comment_map: dict[Any, Any] | None = None
+        self._comment_token_id_to_index: dict[int, int] = {}
+        self._emitted_comment_indices: set[int] = set()
+        self._inline_after_token: dict[int, list[str]] = {}
+        self._inline_after_open_brace: dict[int, list[str]] = {}
+        self._inline_after_close_paren: dict[int, list[str]] = {}
+        self._open_brace_index: int = 0
+        self._close_paren_index: int = 0
+
+    def visit_topdown(self, tree: Tree) -> str:
+        # Reset comment state per-visit.
+        self._comment_map = None
+        self._comment_token_id_to_index = {}
+        self._emitted_comment_indices = set()
+        self._inline_after_token = {}
+        self._inline_after_open_brace = {}
+        self._inline_after_close_paren = {}
+        self._open_brace_index = 0
+        self._close_paren_index = 0
+
+        if self._preserve_comments and hasattr(tree, "meta"):
+            comment_map = getattr(tree.meta, "sparql_comments", None)
+            token_ids = getattr(tree.meta, "sparql_comment_token_ids", None)
+            if isinstance(comment_map, dict) and isinstance(token_ids, list):
+                self._comment_map = comment_map
+                self._comment_token_id_to_index = {
+                    int(token_id): i for i, token_id in enumerate(token_ids)
+                }
+            inline_after_token = getattr(tree.meta, "sparql_inline_comments_after_token", None)
+            if isinstance(inline_after_token, dict):
+                self._inline_after_token = inline_after_token
+            inline_after_open_brace = getattr(
+                tree.meta, "sparql_inline_comments_after_open_brace", None
+            )
+            if isinstance(inline_after_open_brace, dict):
+                self._inline_after_open_brace = inline_after_open_brace
+            inline_after_close_paren = getattr(
+                tree.meta, "sparql_inline_comments_after_close_paren", None
+            )
+            if isinstance(inline_after_close_paren, dict):
+                self._inline_after_close_paren = inline_after_close_paren
+
+        super().visit_topdown(tree)
+
+        # Emit any EOF-anchored comments at the end (safe boundary).
+        if self._preserve_comments and isinstance(self._comment_map, dict):
+            eof_comments = self._comment_map.get("eof", [])
+            if eof_comments:
+                self._emit_comment_lines(eof_comments)
+
+        return self.result
+
+    def _emit_inline_comments_after_token(self, token: Token) -> None:
+        if not self._preserve_comments:
+            return
+        idx = self._comment_token_id_to_index.get(id(token))
+        if idx is None:
+            return
+        comments = self._inline_after_token.get(idx)
+        if not comments:
+            return
+        # Inline comments must end the line.
+        self._trim_trailing_space()
+        for c in comments:
+            self._parts.append(f" {c}")
+        self._parts.append("\n")
+        self._no_space_after = False
+
+    def _emit_inline_comments_after_close_paren(self) -> bool:
+        """Emit inline comments that were originally after ')'.
+
+        Returns True if it emitted (and thus already handled line termination).
+        """
+        if not self._preserve_comments:
+            return False
+        self._close_paren_index += 1
+        comments = self._inline_after_close_paren.get(self._close_paren_index)
+        if not comments:
+            return False
+        self._trim_trailing_space()
+        for c in comments:
+            self._parts.append(f" {c}")
+        self._parts.append("\n")
+        self._no_space_after = False
+        return True
+
+    def _emit_comment_lines(self, comments: list[str]) -> None:
+        """Emit comment lines at a safe boundary (start-of-line)."""
+        if not comments:
+            return
+
+        carry_prefix: str | None = None
+        have_prefix_on_current_line = False
+
+        if not self._at_line_start():
+            # If we're currently only in indentation whitespace (i.e., since the last
+            # newline, only spaces/tabs were emitted), preserve that indentation for
+            # the comment line and also carry it forward for the next token. This
+            # prevents anchored comments from "eating" indentation that was emitted
+            # in advance for the upcoming token.
+            line_suffix_parts: list[str] = []
+            saw_newline = False
+            for part in reversed(self._parts):
+                if "\n" in part:
+                    idx = part.rfind("\n")
+                    line_suffix_parts.append(part[idx + 1 :])
+                    saw_newline = True
+                    break
+                line_suffix_parts.append(part)
+            line_suffix = "".join(reversed(line_suffix_parts))
+
+            if line_suffix and line_suffix.strip() == "":
+                carry_prefix = line_suffix
+                have_prefix_on_current_line = True
+            else:
+                self._trim_trailing_space()
+                self._parts.append("\n")
+
+        for c in comments:
+            # Comments are emitted as standalone lines. If we detected an existing
+            # indentation-only prefix, reuse it; otherwise use current indent.
+            if carry_prefix is not None and have_prefix_on_current_line:
+                # Indentation whitespace is already present on the current line, so
+                # don't duplicate it.
+                self._parts.append(f"{c}\n")
+            else:
+                prefix = (
+                    carry_prefix if carry_prefix is not None else self._indent_prefix()
+                )
+                self._parts.append(f"{prefix}{c}\n")
+            if carry_prefix is not None:
+                # Re-apply indentation for the next token on the following line.
+                self._parts.append(carry_prefix)
+                have_prefix_on_current_line = True
+
+        # After emitting full lines, suppress any pending space.
+        self._no_space_after = False
+
+    def _emit_anchored_comments_for_token(self, token: Token) -> None:
+        if not self._preserve_comments or not isinstance(self._comment_map, dict):
+            return
+
+        idx = self._comment_token_id_to_index.get(id(token))
+        if idx is None or idx in self._emitted_comment_indices:
+            return
+
+        comments = self._comment_map.get(idx)
+        if isinstance(comments, list) and comments:
+            self._emit_comment_lines(comments)
+        self._emitted_comment_indices.add(idx)
+
     def _format_keyword_value(self, value: str) -> str:
         stripped = value.strip()
         if not stripped:
@@ -472,15 +626,22 @@ class SparqlSerializer(IterativeTreeVisitor):
         return self.INDENT_STR * level
 
     def _at_line_start(self) -> bool:
-        if not self._parts:
-            return True
-        return self._parts[-1].endswith("\n")
+        last_char = self._last_char()
+        return last_char is None or last_char == "\n"
 
     def _open_brace(self) -> None:
+        self._open_brace_index += 1
+        inline = self._inline_after_open_brace.get(self._open_brace_index, [])
+
         if self._at_line_start():
-            self._parts.append(f"{self._indent_prefix()}{{\n")
+            self._parts.append(f"{self._indent_prefix()}{{")
         else:
-            self._parts.append("{\n")
+            self._parts.append("{")
+
+        if inline:
+            for c in inline:
+                self._parts.append(f" {c}")
+        self._parts.append("\n")
 
     def _raw_token_value(self, value: str) -> str:
         """Converts a token value to a string with appropriate spacing."""
@@ -492,6 +653,12 @@ class SparqlSerializer(IterativeTreeVisitor):
 
     def _handle_token(self, token: Token) -> None:
         """Handles a Token by appending its value to the result parts."""
+        if self._preserve_comments:
+            if token.type == "COMMENT":
+                self._emit_comment_lines([token.value])
+                return
+            self._emit_anchored_comments_for_token(token)
+
         token_value = self._format_keyword_value(token.value)
         if token.type == "DOT_NEWLINE":
             self._no_space_after = False
@@ -504,6 +671,23 @@ class SparqlSerializer(IterativeTreeVisitor):
                 return
             self._parts.append(" ")
         elif token.type == "RAW":
+            # Special case: RAW ')' is commonly used by handlers instead of the original token.
+            # If there's an inline comment that was after ')', emit it here.
+            if token_value in (")", ") ", ")\n"):
+                # Emit the ')' itself.
+                self._trim_trailing_space()
+                self._parts.append(")")
+                emitted = self._emit_inline_comments_after_close_paren()
+                if emitted:
+                    # Swallow any trailing space/newline that would have come from RAW.
+                    return
+                # If original RAW included newline, keep it; otherwise keep trailing space if present.
+                if token_value.endswith("\n"):
+                    self._parts.append("\n")
+                elif token_value.endswith(" "):
+                    self._parts.append(" ")
+                return
+
             first_char = token_value[0] if token_value else ""
             if first_char in self._NO_SPACE_BEFORE:
                 self._trim_trailing_space()
@@ -525,6 +709,9 @@ class SparqlSerializer(IterativeTreeVisitor):
             else:
                 self._no_space_after = False
                 self._parts.append(" ")
+
+        if self._preserve_comments:
+            self._emit_inline_comments_after_token(token)
 
     def _build_handler_map(self) -> dict[str, dict[str, Any]]:
         """Builds a map of tree node types to their respective handlers (unbound methods).
@@ -970,6 +1157,7 @@ class SparqlSerializer(IterativeTreeVisitor):
             base_node = _safe_get_child(base_decl, 0, Tree, "base_decl")
             base_token = _safe_get_child(base_node, 0, Token, "base")
             iriref_token = _safe_get_child(base_decl, 1, Token, "base_decl.iriref")
+            self._emit_anchored_comments_for_token(base_token)
             base_value = self._format_keyword_value(base_token.value)
             self._parts.append(f"{base_value} {iriref_token.value}\n")
 
@@ -981,6 +1169,7 @@ class SparqlSerializer(IterativeTreeVisitor):
             )
             pname_ns_token = _safe_get_child(pname_ns_node, 0, Token, "pname_ns")
             iriref_token = _safe_get_child(prefix_decl, 2, Token, "prefix_decl.iriref")
+            self._emit_anchored_comments_for_token(prefix_token)
             prefix_value = self._format_keyword_value(prefix_token.value)
             self._parts.append(
                 f"{prefix_value} {pname_ns_token.value} {iriref_token.value}\n"
@@ -1012,12 +1201,10 @@ class SparqlSerializer(IterativeTreeVisitor):
         for i in range(len(tokens) - 1, -1, -1):
             token = tokens[i]
             if token.value.lower() == "select":
+                # Preserve the original token instance so comment anchoring works.
+                self._stack.append((token, TraversalPhase.ENTER, context))
                 self._stack.append(
-                    (
-                        Token("SELECT", self._indent_prefix() + token.value),
-                        TraversalPhase.ENTER,
-                        context,
-                    )
+                    (Token("RAW", self._indent_prefix()), TraversalPhase.ENTER, context)
                 )
             else:
                 self._stack.append((token, TraversalPhase.ENTER, context))
@@ -1027,9 +1214,13 @@ class SparqlSerializer(IterativeTreeVisitor):
     def _where_clause_enter(self, tree: Tree, context: dict[str, Any]) -> bool:
         where_token = self._find_token(tree, "WHERE")
         if where_token:
+            self._emit_anchored_comments_for_token(where_token)
             self._trim_trailing_space()
             where_value = self._format_keyword_value(where_token.value)
-            self._parts.append(f"\n{self._indent_prefix()}{where_value} ")
+            if self._at_line_start():
+                self._parts.append(f"{self._indent_prefix()}{where_value} ")
+            else:
+                self._parts.append(f"\n{self._indent_prefix()}{where_value} ")
 
         # Traverse any children that are Trees (graph pattern)
         # Note: if there is a where token, the pattern is usually next, but we just traverse all children
@@ -1047,9 +1238,11 @@ class SparqlSerializer(IterativeTreeVisitor):
         named_token = self._find_token(tree, "NAMED")
 
         if from_token:
+            self._emit_anchored_comments_for_token(from_token)
             from_value = self._format_keyword_value(from_token.value)
             self._parts.append(f"{from_value} ")
         if named_token:
+            self._emit_anchored_comments_for_token(named_token)
             named_value = self._format_keyword_value(named_token.value)
             self._parts.append(f"{named_value} ")
 
@@ -1071,8 +1264,10 @@ class SparqlSerializer(IterativeTreeVisitor):
 
         prefix = ""
         if group_token:
+            self._emit_anchored_comments_for_token(group_token)
             prefix += f"{self._format_keyword_value(group_token.value)} "
         if by_token:
+            self._emit_anchored_comments_for_token(by_token)
             prefix += f"{self._format_keyword_value(by_token.value)} "
 
         self._parts.append(self._indent_prefix() + prefix)
@@ -1087,9 +1282,13 @@ class SparqlSerializer(IterativeTreeVisitor):
     def _having_clause_enter(self, tree: Tree, context: dict[str, Any]) -> bool:
         having_token = self._find_token(tree, "HAVING")
         if having_token:
+            self._emit_anchored_comments_for_token(having_token)
             self._trim_trailing_space()
             having_value = self._format_keyword_value(having_token.value)
-            self._parts.append(f"\n{self._indent_prefix()}{having_value} ")
+            if self._at_line_start():
+                self._parts.append(f"{self._indent_prefix()}{having_value} ")
+            else:
+                self._parts.append(f"\n{self._indent_prefix()}{having_value} ")
 
         for i in range(len(tree.children) - 1, -1, -1):
             child = tree.children[i]
@@ -1103,12 +1302,17 @@ class SparqlSerializer(IterativeTreeVisitor):
 
         prefix = ""
         if order_token:
+            self._emit_anchored_comments_for_token(order_token)
             prefix += f"{self._format_keyword_value(order_token.value)} "
         if by_token:
+            self._emit_anchored_comments_for_token(by_token)
             prefix += f"{self._format_keyword_value(by_token.value)} "
 
         self._trim_trailing_space()
-        self._parts.append(f"\n{self._indent_prefix()}{prefix}")
+        if self._at_line_start():
+            self._parts.append(f"{self._indent_prefix()}{prefix}")
+        else:
+            self._parts.append(f"\n{self._indent_prefix()}{prefix}")
 
         for i in range(len(tree.children) - 1, -1, -1):
             child = tree.children[i]
@@ -1242,7 +1446,10 @@ class SparqlSerializer(IterativeTreeVisitor):
     def _group_graph_pattern_exit(self, tree: Tree, context: dict[str, Any]) -> None:
         self._indent -= 1
         self._trim_trailing_space()
-        self._parts.append(f"\n{self._indent_prefix()}}}")
+        if self._at_line_start():
+            self._parts.append(f"{self._indent_prefix()}}}")
+        else:
+            self._parts.append(f"\n{self._indent_prefix()}}}")
 
     def _group_graph_pattern_sub_other_enter(
         self, tree: Tree, context: dict[str, Any]
@@ -1277,6 +1484,8 @@ class SparqlSerializer(IterativeTreeVisitor):
         self, tree: Tree, context: dict[str, Any]
     ) -> bool:
         optional_token = tree.children[0]
+        if isinstance(optional_token, Token):
+            self._emit_anchored_comments_for_token(optional_token)
         optional_value = self._format_keyword_value(optional_token.value)
         self._parts.append(f"{self._indent_prefix()}{optional_value} ")
         self._stack.append((tree.children[1], TraversalPhase.ENTER, context))
@@ -1284,6 +1493,8 @@ class SparqlSerializer(IterativeTreeVisitor):
 
     def _minus_graph_pattern_enter(self, tree: Tree, context: dict[str, Any]) -> bool:
         minus_token = tree.children[0]
+        if isinstance(minus_token, Token):
+            self._emit_anchored_comments_for_token(minus_token)
         minus_value = self._format_keyword_value(minus_token.value)
         self._parts.append(f"{self._indent_prefix()}{minus_value} ")
         self._stack.append((tree.children[1], TraversalPhase.ENTER, context))
@@ -1291,6 +1502,8 @@ class SparqlSerializer(IterativeTreeVisitor):
 
     def _graph_graph_pattern_enter(self, tree: Tree, context: dict[str, Any]) -> bool:
         graph_token = tree.children[0]
+        if isinstance(graph_token, Token):
+            self._emit_anchored_comments_for_token(graph_token)
         graph_value = self._format_keyword_value(graph_token.value)
         self._parts.append(f"{self._indent_prefix()}{graph_value} ")
         self._stack.append((tree.children[2], TraversalPhase.ENTER, context))
@@ -1303,12 +1516,10 @@ class SparqlSerializer(IterativeTreeVisitor):
         for i in range(len(tree.children) - 1, -1, -1):
             child = tree.children[i]
             if isinstance(child, Token) and child.value.lower() == "union":
+                # Preserve original token instance for comment anchoring.
+                self._stack.append((child, TraversalPhase.ENTER, context))
                 self._stack.append(
-                    (
-                        Token("UNION", f"{self._indent_prefix()}{child.value}"),
-                        TraversalPhase.ENTER,
-                        context,
-                    )
+                    (Token("RAW", self._indent_prefix()), TraversalPhase.ENTER, context)
                 )
             else:
                 self._stack.append((child, TraversalPhase.ENTER, context))
@@ -1318,12 +1529,10 @@ class SparqlSerializer(IterativeTreeVisitor):
         for i in range(len(tree.children) - 1, -1, -1):
             child = tree.children[i]
             if isinstance(child, Token) and child.value.lower() == "service":
+                # Preserve original token instance for comment anchoring.
+                self._stack.append((child, TraversalPhase.ENTER, context))
                 self._stack.append(
-                    (
-                        Token("SERVICE", f"{self._indent_prefix()}{child.value}"),
-                        TraversalPhase.ENTER,
-                        context,
-                    )
+                    (Token("RAW", self._indent_prefix()), TraversalPhase.ENTER, context)
                 )
             else:
                 self._stack.append((child, TraversalPhase.ENTER, context))
@@ -1331,6 +1540,8 @@ class SparqlSerializer(IterativeTreeVisitor):
 
     def _filter_enter(self, tree: Tree, context: dict[str, Any]) -> bool:
         filter_token = tree.children[0]
+        if isinstance(filter_token, Token):
+            self._emit_anchored_comments_for_token(filter_token)
         filter_value = self._format_keyword_value(filter_token.value)
         self._parts.append(f"{self._indent_prefix()}{filter_value} ")
         self._stack.append((tree.children[1], TraversalPhase.ENTER, context))
@@ -1342,19 +1553,20 @@ class SparqlSerializer(IterativeTreeVisitor):
         as_token = _safe_get_child(tree, 2, Token, "bind")
         var = _safe_get_child(tree, 3, Tree, "bind.var")
 
+        self._emit_anchored_comments_for_token(bind_token)
         bind_value = self._format_keyword_value(bind_token.value)
         as_value = self._format_keyword_value(as_token.value)
         self._parts.append(f"{self._indent_prefix()}{bind_value} (")
         self._stack.append((Token("RPAR", ") "), TraversalPhase.ENTER, context))
         self._stack.append((var, TraversalPhase.ENTER, context))
-        self._stack.append(
-            (Token("AS", f" {as_value}"), TraversalPhase.ENTER, context)
-        )
+        self._stack.append((Token("RAW", f" {as_value} "), TraversalPhase.ENTER, context))
         self._stack.append((expression, TraversalPhase.ENTER, context))
         return True
 
     def _inline_data_enter(self, tree: Tree, context: dict[str, Any]) -> bool:
         values_token = tree.children[0]
+        if isinstance(values_token, Token):
+            self._emit_anchored_comments_for_token(values_token)
         values_value = self._format_keyword_value(values_token.value)
         self._parts.append(f"{self._indent_prefix()}{values_value} ")
         self._stack.append((tree.children[1], TraversalPhase.ENTER, context))
@@ -1364,6 +1576,8 @@ class SparqlSerializer(IterativeTreeVisitor):
         if not tree.children:
             return True
         values_token = tree.children[0]
+        if isinstance(values_token, Token):
+            self._emit_anchored_comments_for_token(values_token)
         values_value = self._format_keyword_value(values_token.value)
         self._parts.append(f"{values_value} ")
         self._stack.append((tree.children[1], TraversalPhase.ENTER, context))
@@ -1817,10 +2031,30 @@ class SparqlSerializer(IterativeTreeVisitor):
 
     def _string_enter(self, tree: Tree, context: dict[str, Any]) -> bool:
         child = _safe_get_child(tree, 0, Token, "string")
+        self._emit_anchored_comments_for_token(child)
         self._parts.append(f"{child.value} ")
+        self._emit_inline_comments_after_token(child)
         return True
 
     def _iri_enter(self, tree: Tree, context: dict[str, Any]) -> bool:
+        # Preserve comment anchoring by emitting comments before the underlying token.
+        if not tree.children:
+            raise SerializerError(f"iri node has no children: {tree}")
+
+        value = tree.children[0]
+        if isinstance(value, Token):
+            self._emit_anchored_comments_for_token(value)
+            self._parts.append(f"{value.value} ")
+            self._emit_inline_comments_after_token(value)
+            return True
+        if isinstance(value, Tree) and value.data == "prefixed_name":
+            tok = _safe_get_child(value, 0, Token, "prefixed_name")
+            self._emit_anchored_comments_for_token(tok)
+            self._parts.append(f"{tok.value} ")
+            self._emit_inline_comments_after_token(tok)
+            return True
+
+        # Fallback (shouldn't happen with current grammar).
         self._parts.append(f"{get_iri(tree)} ")
         return True
 
@@ -1843,28 +2077,42 @@ class SparqlSerializer(IterativeTreeVisitor):
         return True
 
     def _var_enter(self, tree: Tree, context: dict[str, Any]) -> bool:
-        self._parts.append(f"{get_var(tree)} ")
+        child = _safe_get_child(tree, 0, Token, "var")
+        self._emit_anchored_comments_for_token(child)
+        self._parts.append(f"{child.value} ")
+        self._emit_inline_comments_after_token(child)
         return True
 
     def _rdf_literal_enter(self, tree: Tree, context: dict[str, Any]) -> bool:
+        # Anchor to the opening string token of the literal.
+        string_node = _safe_get_child(tree, 0, Tree, "rdf_literal.string")
+        value_token = _safe_get_child(string_node, 0, Token, "rdf_literal.string.value")
+        self._emit_anchored_comments_for_token(value_token)
         self._parts.append(f"{get_rdf_literal(tree)} ")
+        self._emit_inline_comments_after_token(value_token)
         return True
 
     def _numeric_literal_enter(self, tree: Tree, context: dict[str, Any]) -> bool:
         child_tree = _safe_get_child(tree, 0, Tree, "numeric_literal")
         val = _safe_get_child(child_tree, 0, Token, "numeric_literal.value")
+        self._emit_anchored_comments_for_token(val)
         self._parts.append(f"{val.value} ")
+        self._emit_inline_comments_after_token(val)
         return True
 
     def _boolean_literal_enter(self, tree: Tree, context: dict[str, Any]) -> bool:
         child_tree = _safe_get_child(tree, 0, Tree, "boolean_literal")
         val = _safe_get_child(child_tree, 0, Token, "boolean_literal.value")
+        self._emit_anchored_comments_for_token(val)
         self._parts.append(f"{val.value} ")
+        self._emit_inline_comments_after_token(val)
         return True
 
     def _blank_node_enter(self, tree: Tree, context: dict[str, Any]) -> bool:
         child = _safe_get_child(tree, 0, Token, "blank_node")
+        self._emit_anchored_comments_for_token(child)
         self._parts.append(f"{child.value} ")
+        self._emit_inline_comments_after_token(child)
         return True
 
     def _anon_enter(self, tree: Tree, context: dict[str, Any]) -> bool:
@@ -1881,42 +2129,71 @@ class SparqlSerializer(IterativeTreeVisitor):
 
     def _iriref_enter(self, tree: Tree, context: dict[str, Any]) -> bool:
         child = _safe_get_child(tree, 0, Token, "iriref")
+        self._emit_anchored_comments_for_token(child)
         self._parts.append(f"{child.value} ")
+        self._emit_inline_comments_after_token(child)
         return True
 
     def _prefixed_name_enter(self, tree: Tree, context: dict[str, Any]) -> bool:
         child = _safe_get_child(tree, 0, Token, "prefixed_name")
+        self._emit_anchored_comments_for_token(child)
         self._parts.append(f"{child.value} ")
+        self._emit_inline_comments_after_token(child)
         return True
 
     def _inline_data_one_var_enter(self, tree: Tree, context: dict[str, Any]) -> bool:
+        # Format as:
+        # VALUES ?v {
+        #     <v1>
+        #     <v2>
+        # }
         self._stack.append((tree, TraversalPhase.EXIT, context))
-        for i in range(len(tree.children) - 1, -1, -1):
-            child = tree.children[i]
-            if isinstance(child, Token):
-                if child.value == "{":
-                    self._stack.append(
-                        (Token("RAW", "{\n"), TraversalPhase.ENTER, context)
-                    )
-                elif child.value == "}":
-                    self._stack.append(
-                        (
-                            Token("RAW", f"\n{self._indent_prefix()}}}"),
-                            TraversalPhase.ENTER,
-                            context,
-                        )
-                    )
-            elif isinstance(child, Tree) and child.data == "data_block_value":
-                self._stack.append((child, TraversalPhase.ENTER, context))
-                self._stack.append(
-                    (
-                        Token("RAW", f"{self._indent_prefix(1)}"),
-                        TraversalPhase.ENTER,
-                        context,
-                    )
+
+        var_node = next(
+            (
+                c
+                for c in tree.children
+                if isinstance(c, Tree) and getattr(c, "data", None) == "var"
+            ),
+            None,
+        )
+        values = [
+            c
+            for c in tree.children
+            if isinstance(c, Tree) and getattr(c, "data", None) == "data_block_value"
+        ]
+
+        # Closing brace. If we emitted at least one value, the last value will have
+        # already ended the line with '\n'. If empty, force a newline after '{'.
+        if values:
+            self._stack.append(
+                (Token("RAW", f"{self._indent_prefix()}}}"), TraversalPhase.ENTER, context)
+            )
+        else:
+            self._stack.append(
+                (
+                    Token("RAW", f"\n{self._indent_prefix()}}}"),
+                    TraversalPhase.ENTER,
+                    context,
                 )
-            else:
-                self._stack.append((child, TraversalPhase.ENTER, context))
+            )
+
+        # Emit each value on its own line.
+        for v in reversed(values):
+            # Newline trims trailing space from the value emitter.
+            self._stack.append((Token("RAW", "\n"), TraversalPhase.ENTER, context))
+            self._stack.append((v, TraversalPhase.ENTER, context))
+            self._stack.append(
+                (Token("RAW", self._indent_prefix(1)), TraversalPhase.ENTER, context)
+            )
+
+        # Opening brace
+        self._stack.append((Token("RAW", "{\n"), TraversalPhase.ENTER, context))
+
+        # Variable (e.g. ?g)
+        if var_node is not None:
+            self._stack.append((var_node, TraversalPhase.ENTER, context))
+
         return True
 
     def _inline_data_full_enter(self, tree: Tree, context: dict[str, Any]) -> bool:
@@ -1926,6 +2203,10 @@ class SparqlSerializer(IterativeTreeVisitor):
         VALUES data_block_value_group { ( ... ) }
         It manages the braces and parentheses explicitly via RAW tokens.
         """
+        # Normalize any trailing space after VALUES so we can control spacing
+        # around the header parentheses deterministically.
+        self._trim_trailing_space()
+
         self._stack.append((tree, TraversalPhase.EXIT, context))
         for i in range(len(tree.children) - 1, -1, -1):
             child = tree.children[i]
@@ -1943,17 +2224,14 @@ class SparqlSerializer(IterativeTreeVisitor):
                         )
                     )
                 elif child.value == "(":
-                    self._stack.append(
-                        (Token("RAW", "("), TraversalPhase.ENTER, context)
-                    )
+                    # Ensure exactly one space before the opening paren.
+                    self._stack.append((Token("RAW", " ("), TraversalPhase.ENTER, context))
                 elif child.value == ")":
-                    self._stack.append(
-                        (Token("RAW", ") "), TraversalPhase.ENTER, context)
-                    )
+                    # Trim trailing space inside the list, then add ') '.
+                    self._stack.append((Token("RAW", ") "), TraversalPhase.ENTER, context))
                 elif child.value == "()":
-                    self._stack.append(
-                        (Token("RAW", "() "), TraversalPhase.ENTER, context)
-                    )
+                    # NIL header (rare): keep one leading space.
+                    self._stack.append((Token("RAW", " () "), TraversalPhase.ENTER, context))
                 else:
                     self._stack.append((child, TraversalPhase.ENTER, context))
             else:
@@ -1963,22 +2241,38 @@ class SparqlSerializer(IterativeTreeVisitor):
     def _data_block_value_group_enter(
         self, tree: Tree, context: dict[str, Any]
     ) -> bool:
-        self._parts.append(self._indent_prefix(1))
+        # Format rows as:
+        #     (<v1> <v2>)
+        # Each group is on its own line.
+        nil_token = next(
+            (
+                c
+                for c in tree.children
+                if isinstance(c, Token) and (c.type == "NIL" or c.value == "()")
+            ),
+            None,
+        )
+        if nil_token is not None:
+            self._stack.append(
+                (Token("RAW", f"{self._indent_prefix(1)}()\n"), TraversalPhase.ENTER, context)
+            )
+            return True
+
+        # Close paren + newline (will trim trailing space).
+        self._stack.append((Token("RAW", ")\n"), TraversalPhase.ENTER, context))
+
+        # Push values inside the row.
         for i in range(len(tree.children) - 1, -1, -1):
             child = tree.children[i]
-            if isinstance(child, Token):
-                if child.value == "(":
-                    self._stack.append(
-                        (Token("RAW", "("), TraversalPhase.ENTER, context)
-                    )
-                elif child.value == ")":
-                    self._stack.append(
-                        (Token("RAW", ")\n"), TraversalPhase.ENTER, context)
-                    )
-            else:
-                self._stack.append((child, TraversalPhase.ENTER, context))
+            if isinstance(child, Token) and child.value in ("(", ")"):
+                continue
+            self._stack.append((child, TraversalPhase.ENTER, context))
+
+        # Open paren with indentation included (avoid trimming indentation).
+        self._stack.append(
+            (Token("RAW", f"{self._indent_prefix(1)}("), TraversalPhase.ENTER, context)
+        )
         return True
 
     def _data_block_value_enter(self, tree: Tree, context: dict[str, Any]) -> bool:
         return False
-

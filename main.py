@@ -7,8 +7,9 @@ prefix ex:	<http://www.example.org/schema#>
 prefix in:	<http://www.example.org/instance#>
 
 select ?x where {
+VALUES ?g { <urn:g1> <urn:g2> }
 graph ?g {
-  {select ?x where {?x ?p ?g}}
+  {select ?x where {?x ?p ?g filter(?x != in:i1)}}
 }
 }
 """

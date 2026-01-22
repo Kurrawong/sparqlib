@@ -27,6 +27,32 @@ formatted = sparql.format_string(query)
 print(formatted)
 ```
 
+### Preserving comments
+
+Comments are preserved end-to-end through `format_string` and `parse`/`serialize` by default.
+To disable comment preservation, use `preserve_comments=False`:
+
+```python
+import sparql
+
+query = "SELECT * WHERE { # comment\n  ?s ?p ?o }\n"
+formatted = sparql.format_string(query)
+print(formatted)
+
+tree = sparql.parse(query)
+print(sparql.serialize(tree))
+
+no_comments = sparql.format_string(query, preserve_comments=False)
+print(no_comments)
+```
+
+Notes:
+- Comments are preserved using **stable anchoring** (nearby-token association), not exact original spacing.
+- Comments are emitted as **standalone lines** by default for safety, but common inline forms are preserved:
+  - `SELECT ?x # comment` (inline after a token)
+  - `WHERE { # comment` (inline after `{`)
+  - `FILTER(... ) # comment` (inline after `)`)
+
 For advanced usage with the AST:
 
 ```python

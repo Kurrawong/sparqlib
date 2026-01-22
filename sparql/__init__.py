@@ -4,6 +4,7 @@ from typing import Literal, Optional
 from lark import Token, Tree
 from lark.exceptions import LarkError, UnexpectedInput
 
+from sparql.comments import attach_comments, scan_raw_comments
 from sparql.parser import sparql_parser, sparql_update_parser
 from sparql.serializer import SparqlSerializer
 
@@ -224,6 +225,7 @@ def format_string(
     parser_type: Optional[ParserType] = None,
     *,
     strict: bool = False,
+    preserve_comments: bool = True,
 ) -> str:
     """Parse the input string and return a formatted version of it.
 
@@ -247,8 +249,12 @@ def format_string(
     context = "query" if guessed_type == "sparql" else "update"
 
     try:
-        tree = primary_parser.parse(query)
-        serializer = SparqlSerializer()
+        if preserve_comments:
+            tree = primary_parser.parse(query)
+            attach_comments(tree, scan_raw_comments(query))
+        else:
+            tree = primary_parser.parse(query)
+        serializer = SparqlSerializer(preserve_comments=preserve_comments)
         serializer.visit_topdown(tree)
         return serializer.result
     except (LarkError, UnexpectedInput) as e:
@@ -262,8 +268,12 @@ def format_string(
     )
 
     try:
-        tree = secondary_parser.parse(query)
-        serializer = SparqlSerializer()
+        if preserve_comments:
+            tree = secondary_parser.parse(query)
+            attach_comments(tree, scan_raw_comments(query))
+        else:
+            tree = secondary_parser.parse(query)
+        serializer = SparqlSerializer(preserve_comments=preserve_comments)
         serializer.visit_topdown(tree)
         return serializer.result
     except (LarkError, UnexpectedInput):
@@ -271,7 +281,9 @@ def format_string(
         raise _wrap_lark_error(first_error, f"SPARQL {context}") from first_error
 
 
-def format_string_explicit(query: str, parser_type: ParserType = "sparql") -> str:
+def format_string_explicit(
+    query: str, parser_type: ParserType = "sparql", *, preserve_comments: bool = True
+) -> str:
     """Parse the input string and return a formatted version of it.
 
     This is faster than the format_string function if you know the query type ahead of time.
@@ -294,11 +306,15 @@ def format_string_explicit(query: str, parser_type: ParserType = "sparql") -> st
         )
 
     try:
-        tree = _parser.parse(query)
+        if preserve_comments:
+            tree = _parser.parse(query)
+            attach_comments(tree, scan_raw_comments(query))
+        else:
+            tree = _parser.parse(query)
     except (LarkError, UnexpectedInput) as e:
         raise _wrap_lark_error(e, context) from e
 
-    serializer = SparqlSerializer()
+    serializer = SparqlSerializer(preserve_comments=preserve_comments)
     serializer.visit_topdown(tree)
 
     return serializer.result
@@ -352,7 +368,12 @@ def validate_update(query: str) -> bool:
     return validate(query, parser_type="sparql_update")
 
 
-def parse(query: str, parser_type: Optional[ParserType] = None) -> Tree:
+def parse(
+    query: str,
+    parser_type: Optional[ParserType] = None,
+    *,
+    preserve_comments: bool = True,
+) -> Tree:
     """Parse a SPARQL query or update and return the AST.
 
     This function provides direct access to the parsed abstract syntax tree,
@@ -370,23 +391,31 @@ def parse(query: str, parser_type: Optional[ParserType] = None) -> Tree:
     if parser_type is None:
         guessed_type = _guess_parser_type(query)
         try:
-            return parse(query, guessed_type)
+            return parse(query, guessed_type, preserve_comments=preserve_comments)
         except SparqlSyntaxError as e:
             other_type: ParserType = (
                 "sparql_update" if guessed_type == "sparql" else "sparql"
             )
             try:
-                return parse(query, other_type)
+                return parse(query, other_type, preserve_comments=preserve_comments)
             except SparqlSyntaxError:
                 raise e
 
     if parser_type == "sparql":
         try:
+            if preserve_comments:
+                tree = sparql_parser.parse(query)
+                attach_comments(tree, scan_raw_comments(query))
+                return tree
             return sparql_parser.parse(query)
         except (LarkError, UnexpectedInput) as e:
             raise _wrap_lark_error(e, "SPARQL query") from e
     elif parser_type == "sparql_update":
         try:
+            if preserve_comments:
+                tree = sparql_update_parser.parse(query)
+                attach_comments(tree, scan_raw_comments(query))
+                return tree
             return sparql_update_parser.parse(query)
         except (LarkError, UnexpectedInput) as e:
             raise _wrap_lark_error(e, "SPARQL update") from e
@@ -396,7 +425,7 @@ def parse(query: str, parser_type: Optional[ParserType] = None) -> Tree:
         )
 
 
-def parse_query(query: str) -> Tree:
+def parse_query(query: str, *, preserve_comments: bool = True) -> Tree:
     """Parse a SPARQL query and return the AST.
 
     This is a convenience function equivalent to parse(query, "sparql").
@@ -405,10 +434,10 @@ def parse_query(query: str) -> Tree:
     :return: The parsed AST as a lark.Tree.
     :raises SparqlSyntaxError: If the query has a syntax error.
     """
-    return parse(query, parser_type="sparql")
+    return parse(query, parser_type="sparql", preserve_comments=preserve_comments)
 
 
-def parse_update(query: str) -> Tree:
+def parse_update(query: str, *, preserve_comments: bool = True) -> Tree:
     """Parse a SPARQL update and return the AST.
 
     This is a convenience function equivalent to parse(query, "sparql_update").
@@ -417,10 +446,10 @@ def parse_update(query: str) -> Tree:
     :return: The parsed AST as a lark.Tree.
     :raises SparqlSyntaxError: If the update has a syntax error.
     """
-    return parse(query, parser_type="sparql_update")
+    return parse(query, parser_type="sparql_update", preserve_comments=preserve_comments)
 
 
-def serialize(tree: Tree) -> str:
+def serialize(tree: Tree, *, preserve_comments: bool = True) -> str:
     """Serialize a SPARQL AST back to a string.
 
     This function enables round-tripping: parse a query, modify the AST,
@@ -429,6 +458,6 @@ def serialize(tree: Tree) -> str:
     :param tree: A lark.Tree representing a parsed SPARQL query or update.
     :return: The serialized SPARQL string.
     """
-    serializer = SparqlSerializer()
+    serializer = SparqlSerializer(preserve_comments=preserve_comments)
     serializer.visit_topdown(tree)
     return serializer.result

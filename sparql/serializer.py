@@ -220,6 +220,27 @@ class SparqlSerializer:
 
         return self.result
 
+    def _last_char(self) -> Optional[str]:
+        for part in reversed(self._parts):
+            if part:
+                return part[-1]
+        return None
+
+    def _raw_token_value(self, value: str) -> str:
+        if value in ("(", ")"):
+            return value
+        if value == ",":
+            return ", "
+        return f"{value} "
+
+    def _trim_trailing_space(self) -> None:
+        for i in range(len(self._parts) - 1, -1, -1):
+            part = self._parts[i]
+            if part:
+                if part.endswith(" "):
+                    self._parts[i] = part.rstrip(" ")
+                break
+
     def _handle_tree(
         self, node: Tree, phase: TraversalPhase, context: Optional[TraversalContext]
     ) -> None:
@@ -248,12 +269,20 @@ class SparqlSerializer:
         if token.type == "DOT_NEWLINE":
             self._parts.append(token.value)
         elif token.type == "SPACE":
+            last_char = self._last_char()
+            if last_char is None or last_char.isspace() or last_char in ("(", "["):
+                return
             self._parts.append(" ")
         elif token.type == "RAW":
+            if token.value and token.value[0] in (")", "]", "}", ",", ";", "(", "["):
+                self._trim_trailing_space()
             self._parts.append(token.value)
         else:
+            if token.value and token.value[0] in (")", "]", "}", ",", ";", "(", "["):
+                self._trim_trailing_space()
             self._parts.append(token.value)
-            self._parts.append(" ")
+            if token.value not in ("(", "["):
+                self._parts.append(" ")
 
     def _build_handler_map(self) -> dict[str, dict[str, Any]]:
         """Builds a map of tree node types to their respective handlers (unbound methods).
@@ -1249,7 +1278,11 @@ class SparqlSerializer:
             child = tree.children[i]
             if isinstance(child, Token):
                 self._stack.append(
-                    (Token("RAW", f"{child.value} "), TraversalPhase.ENTER, context)
+                    (
+                        Token("RAW", self._raw_token_value(child.value)),
+                        TraversalPhase.ENTER,
+                        context,
+                    )
                 )
             else:
                 self._stack.append((child, TraversalPhase.ENTER, context))
@@ -1262,7 +1295,11 @@ class SparqlSerializer:
             child = tree.children[i]
             if isinstance(child, Token):
                 self._stack.append(
-                    (Token("RAW", f"{child.value} "), TraversalPhase.ENTER, context)
+                    (
+                        Token("RAW", self._raw_token_value(child.value)),
+                        TraversalPhase.ENTER,
+                        context,
+                    )
                 )
             else:
                 self._stack.append((child, TraversalPhase.ENTER, context))
@@ -1273,7 +1310,11 @@ class SparqlSerializer:
             child = tree.children[i]
             if isinstance(child, Token):
                 self._stack.append(
-                    (Token("RAW", f"{child.value} "), TraversalPhase.ENTER, context)
+                    (
+                        Token("RAW", self._raw_token_value(child.value)),
+                        TraversalPhase.ENTER,
+                        context,
+                    )
                 )
             else:
                 self._stack.append((child, TraversalPhase.ENTER, context))
@@ -1328,7 +1369,11 @@ class SparqlSerializer:
             child = tree.children[i]
             if isinstance(child, Token):
                 self._stack.append(
-                    (Token("RAW", f"{child.value} "), TraversalPhase.ENTER, context)
+                    (
+                        Token("RAW", self._raw_token_value(child.value)),
+                        TraversalPhase.ENTER,
+                        context,
+                    )
                 )
             else:
                 self._stack.append((child, TraversalPhase.ENTER, context))
@@ -1339,7 +1384,11 @@ class SparqlSerializer:
             child = tree.children[i]
             if isinstance(child, Token):
                 self._stack.append(
-                    (Token("RAW", f"{child.value} "), TraversalPhase.ENTER, context)
+                    (
+                        Token("RAW", self._raw_token_value(child.value)),
+                        TraversalPhase.ENTER,
+                        context,
+                    )
                 )
             else:
                 self._stack.append((child, TraversalPhase.ENTER, context))
@@ -1356,8 +1405,9 @@ class SparqlSerializer:
         for i in range(len(tree.children) - 1, -1, -1):
             child = tree.children[i]
             if isinstance(child, Token):
+                token_value = self._raw_token_value(child.value)
                 self._stack.append(
-                    (Token("RAW", f"{child.value} "), TraversalPhase.ENTER, context)
+                    (Token("RAW", token_value), TraversalPhase.ENTER, context)
                 )
             elif isinstance(child, Tree) and child.data == "expression":
                 self._stack.append((child, TraversalPhase.ENTER, context))
@@ -1377,7 +1427,11 @@ class SparqlSerializer:
             child = tree.children[i]
             if isinstance(child, Token):
                 self._stack.append(
-                    (Token("RAW", f"{child.value} "), TraversalPhase.ENTER, context)
+                    (
+                        Token("RAW", self._raw_token_value(child.value)),
+                        TraversalPhase.ENTER,
+                        context,
+                    )
                 )
             else:
                 self._stack.append((child, TraversalPhase.ENTER, context))
@@ -1390,7 +1444,11 @@ class SparqlSerializer:
             child = tree.children[i]
             if isinstance(child, Token):
                 self._stack.append(
-                    (Token("RAW", f"{child.value} "), TraversalPhase.ENTER, context)
+                    (
+                        Token("RAW", self._raw_token_value(child.value)),
+                        TraversalPhase.ENTER,
+                        context,
+                    )
                 )
             else:
                 self._stack.append((child, TraversalPhase.ENTER, context))
@@ -1463,7 +1521,11 @@ class SparqlSerializer:
             child = tree.children[i]
             if isinstance(child, Token):
                 self._stack.append(
-                    (Token("RAW", f"{child.value} "), TraversalPhase.ENTER, context)
+                    (
+                        Token("RAW", self._raw_token_value(child.value)),
+                        TraversalPhase.ENTER,
+                        context,
+                    )
                 )
             else:
                 self._stack.append((child, TraversalPhase.ENTER, context))

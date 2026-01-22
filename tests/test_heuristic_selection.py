@@ -31,6 +31,9 @@ def test_guess_parser_type_query():
     assert _guess_parser_type("DESCRIBE ?s") == "sparql"
     # Default fallback
     assert _guess_parser_type("PREFIX : <http://example.org/>") == "sparql"
+    # Variable names and prefixed names should not trigger update detection
+    assert _guess_parser_type("SELECT ?INSERT WHERE { ?s ?p ?o }") == "sparql"
+    assert _guess_parser_type("SELECT ?s WHERE { ?s :DELETE ?o }") == "sparql"
 
 
 def test_guess_parser_type_ambiguous():

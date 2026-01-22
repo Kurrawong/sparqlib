@@ -102,12 +102,10 @@ def _guess_parser_type(query: str) -> ParserType:
     # But as top-level keywords, they indicate Update.
     # We look for these keywords. If found, we guess 'sparql_update'.
     # A more robust check might skip PREFIX/BASE, but this is just a hint.
-    update_keywords = (
-        r"(?i)\b(INSERT|DELETE|LOAD|CLEAR|DROP|ADD|MOVE|COPY|CREATE|WITH)\b"
-    )
+    update_keywords = r"(?<![?$:])\b(INSERT|DELETE|LOAD|CLEAR|DROP|ADD|MOVE|COPY|CREATE|WITH)\b"
 
     # Query keywords
-    query_keywords = r"(?i)\b(SELECT|CONSTRUCT|ASK|DESCRIBE)\b"
+    query_keywords = r"(?<![?$:])\b(SELECT|CONSTRUCT|ASK|DESCRIBE)\b"
 
     has_update = _contains(update_keywords, clean_query)
     has_query = _contains(query_keywords, clean_query)
@@ -164,16 +162,20 @@ def validate(query: str, parser_type: Optional[ParserType] = None) -> bool:
         )
 
 
-def format_string(query: str) -> str:
+def format_string(query: str, parser_type: Optional[ParserType] = None) -> str:
     """Parse the input string and return a formatted version of it.
 
     It first attempts to parse the query based on a heuristic guess,
     falling back to the other parser if the first fails.
 
     :param query: Input query string.
+    :param parser_type: Optional parser type. If provided, the heuristic is skipped.
     :return: Formatted query.
     :raises SparqlSyntaxError: If the query has a syntax error.
     """
+    if parser_type is not None:
+        return format_string_explicit(query, parser_type=parser_type)
+
     guessed_type = _guess_parser_type(query)
     primary_parser = sparql_parser if guessed_type == "sparql" else sparql_update_parser
     secondary_parser = (

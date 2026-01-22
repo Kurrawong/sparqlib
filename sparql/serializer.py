@@ -337,9 +337,17 @@ class SparqlSerializer(IterativeTreeVisitor):
     """
 
     INDENT_STR = "    "
+    # Prevent pathological output growth for extremely deep nesting (e.g. tests
+    # that intentionally exceed recursion limits). Without a cap, indentation
+    # grows with nesting depth, which can make the serialized string enormous
+    # and dominate runtime when re-parsing.
+    MAX_INDENT_LEVEL = 40
 
     def _indent_prefix(self, extra: int = 0) -> str:
-        return self.INDENT_STR * (self._indent + extra)
+        level = self._indent + extra
+        if level > self.MAX_INDENT_LEVEL:
+            level = self.MAX_INDENT_LEVEL
+        return self.INDENT_STR * level
 
     def _at_line_start(self) -> bool:
         if not self._parts:

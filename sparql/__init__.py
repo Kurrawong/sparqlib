@@ -76,11 +76,13 @@ _UPDATE_KEYWORDS: frozenset[str] = frozenset(
 _PROLOGUE_KEYWORDS: frozenset[str] = frozenset({"prefix", "base"})
 
 # Pattern to tokenize the beginning of a SPARQL query for fast keyword detection
-# Matches: comments, IRIs, prefixed names, keywords/identifiers, or skippable chars
+# Matches: comments, IRIs, prefixed names, prefix labels, keywords/identifiers,
+# or skippable chars
 _TOKEN_PATTERN = re.compile(
     r"""
     \#[^\n]*                           |  # Comments (skip to end of line)
     <[^>]*>                            |  # IRIs
+    [A-Za-z_][A-Za-z0-9_]*:            |  # Prefix labels (e.g., PREFIX ex:)
     [A-Za-z_][A-Za-z0-9_]*:[A-Za-z0-9_]*  |  # Prefixed names (skip)
     [A-Za-z_][A-Za-z0-9_]*             |  # Keywords/identifiers
     \s+                                |  # Whitespace

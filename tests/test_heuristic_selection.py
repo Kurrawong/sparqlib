@@ -34,6 +34,15 @@ def test_guess_parser_type_query():
     # Variable names and prefixed names should not trigger update detection
     assert _guess_parser_type("SELECT ?INSERT WHERE { ?s ?p ?o }") == "sparql"
     assert _guess_parser_type("SELECT ?s WHERE { ?s :DELETE ?o }") == "sparql"
+    # Prefix labels that match keywords should be ignored
+    assert (
+        _guess_parser_type("PREFIX select: <http://ex/> INSERT DATA { <s> <p> <o> }")
+        == "sparql_update"
+    )
+    assert (
+        _guess_parser_type("PREFIX delete: <http://ex/> SELECT * WHERE { ?s ?p ?o }")
+        == "sparql"
+    )
 
 
 def test_guess_parser_type_ambiguous():
@@ -87,28 +96,41 @@ def test_format_string_uses_heuristic_success():
 
 def test_format_string_fallback():
     """Test that if heuristic guesses wrong, it falls back to the other parser."""
-    # The heuristic looks for the first significant keyword after PREFIX/BASE.
-    # For "INSERT { ... } WHERE { SELECT ... }", INSERT comes first -> sparql_update.
-    # This is correct behavior for this query.
-
     query = "INSERT { ?s ?p ?o } WHERE { SELECT ?s WHERE { ?s ?p ?o } }"
-    # The first keyword is INSERT, so it correctly guesses sparql_update
-    assert _guess_parser_type(query) == "sparql_update"
 
-    result = format_string(query)
+    with patch("sparql._guess_parser_type", return_value="sparql"):
+        result = format_string(query)
+
     assert "INSERT" in result
     assert "SELECT" in result
 
-    # Test fallback: a query that fools the heuristic
-    # Put a comment with an update keyword before the actual SELECT
-    query_with_misleading_comment = """
-    # This is a comment about DELETE operations
-    SELECT * WHERE { ?s ?p ?o }
-    """
-    # The heuristic skips comments, so it finds SELECT first
-    assert _guess_parser_type(query_with_misleading_comment) == "sparql"
-    result = format_string(query_with_misleading_comment)
-    assert "SELECT" in result
+
+def test_format_string_strict_rejects_fallback():
+    """Test that strict mode does not try the secondary parser."""
+    from sparql import SparqlSyntaxError
+
+    query = "INSERT { ?s ?p ?o } WHERE { SELECT ?s WHERE { ?s ?p ?o } }"
+
+    with patch("sparql._guess_parser_type", return_value="sparql"):
+        with pytest.raises(SparqlSyntaxError):
+            format_string(query, strict=True)
+
+
+def test_strict_success_cases():
+    """Test strict mode succeeds when heuristic is correct."""
+    assert (
+        format_string(
+            "PREFIX select: <http://ex/> INSERT DATA { <s> <p> <o> }", strict=True
+        )
+        is not None
+    )
+    assert (
+        format_string(
+            "PREFIX delete: <http://ex/> SELECT * WHERE { ?s ?p ?o }",
+            strict=True,
+        )
+        is not None
+    )
 
 
 def test_validate_heuristic():
@@ -123,3 +145,13 @@ def test_validate_heuristic():
     # Invalid query
     with pytest.raises(SparqlSyntaxError):
         validate("NOT A QUERY")
+
+
+def test_validate_strict_rejects_fallback():
+    """Test validate strict mode does not try the secondary parser."""
+    from sparql import SparqlSyntaxError
+
+    query = "INSERT { ?s ?p ?o } WHERE { SELECT ?s WHERE { ?s ?p ?o } }"
+    with patch("sparql._guess_parser_type", return_value="sparql"):
+        with pytest.raises(SparqlSyntaxError):
+            validate(query, strict=True)

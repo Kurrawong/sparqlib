@@ -1,5 +1,6 @@
-from sparql import format_string, get_serializer_info
+from sparql import format_string
 from sparql.parser import sparql_parser
+from sparql.serializer import SparqlSerializer
 
 query = r"""
 prefix ex:	<http://www.example.org/schema#>
@@ -12,7 +13,7 @@ graph ?g {
 }
 """
 
-print(f"Using serializer: {get_serializer_info()}")
+print(f"Using serializer: {SparqlSerializer.__name__}")
 
 # Original tree
 tree = sparql_parser.parse(query)

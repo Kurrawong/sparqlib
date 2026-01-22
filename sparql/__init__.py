@@ -84,7 +84,7 @@ def _remove_noise(text: str) -> str:
         '''[\s\S]*?'''                     |  # Triple single-quoted strings
         "[^"\\]*(?:\\.[^"\\]*)*"           |  # Double quoted strings
         '[^'\\]*(?:\\.[^'\\]*)*'           |  # Single quoted strings
-        <[^>]*>                               # IRIs (simplified)
+        <[^>\\s]*>                               # IRIs (simplified)
     """
     return re.sub(pattern, " ", text, flags=re.VERBOSE | re.MULTILINE)
 

@@ -15,7 +15,6 @@ class TraversalPhase(Enum):
 
     ENTER = auto()
     EXIT = auto()
-    LEAF = auto()
 
 
 class TreeHandler(NamedTuple):

@@ -9,6 +9,18 @@ from sparql.serializer import SparqlSerializer
 
 ParserType = Literal["sparql", "sparql_update"]
 
+__all__ = [
+    "format_string",
+    "format_string_explicit",
+    "format_query",
+    "format_update",
+    "validate",
+    "validate_query",
+    "validate_update",
+    "SparqlSyntaxError",
+    "ParserType",
+]
+
 
 class SparqlSyntaxError(Exception):
     """Raised when a SPARQL query has a syntax error.
@@ -103,31 +115,27 @@ def validate(query: str, parser_type: Optional[ParserType] = None) -> bool:
 
     This is faster than format_string when you only need to check validity.
 
+    When parser_type is None, a heuristic is used to guess the most likely
+    parser type. If parsing fails, the other parser is tried as a fallback.
+    If both parsers fail, the error from the initially guessed parser is raised.
+
     :param query: Input query string.
     :param parser_type: Optional parser type. If None, tries both parsers.
     :return: True if the query is valid.
     :raises SparqlSyntaxError: If the query has a syntax error.
+    :raises ValueError: If parser_type is not None, "sparql", or "sparql_update".
     """
     if parser_type is None:
-        # specific optimization: guess type to avoid double parsing penalty
-        parser_type = _guess_parser_type(query)
-        # We will try the guessed one first, then fallback
+        guessed_type = _guess_parser_type(query)
         try:
-            return validate(query, parser_type)
+            return validate(query, guessed_type)
         except SparqlSyntaxError as e:
-            # If the guess failed, try the other one
             other_type: ParserType = (
-                "sparql_update" if parser_type == "sparql" else "sparql"
+                "sparql_update" if guessed_type == "sparql" else "sparql"
             )
             try:
                 return validate(query, other_type)
             except SparqlSyntaxError:
-                # If both fail, raise the error from the guessed type (original attempt)
-                # or maybe the first one makes more sense?
-                # Actually, if the user didn't specify, we usually assume Query implies Query syntax error.
-                # But if it was an Update, we want that error.
-                # Let's raise the error corresponding to the one that matched the structure closest?
-                # For now, let's just re-raise the first one as it was the "best guess".
                 raise e
 
     if parser_type == "sparql":
@@ -142,8 +150,10 @@ def validate(query: str, parser_type: Optional[ParserType] = None) -> bool:
             return True
         except (LarkError, UnexpectedInput) as e:
             raise _wrap_lark_error(e, "SPARQL update") from e
-
-    return False
+    else:
+        raise ValueError(
+            f"Unexpected parser type: {parser_type}. Must be one of {ParserType}"
+        )
 
 
 def format_string(query: str) -> str:
@@ -192,19 +202,73 @@ def format_string_explicit(query: str, parser_type: ParserType = "sparql") -> st
     :param parser_type: The parser type, either "sparql" or "sparql_update".
     :return: Formatted query.
     :raises SparqlSyntaxError: If the query has a syntax error.
+    :raises ValueError: If parser_type is not "sparql" or "sparql_update".
     """
     if parser_type == "sparql":
         _parser = sparql_parser
+        context = "SPARQL query"
     elif parser_type == "sparql_update":
         _parser = sparql_update_parser
+        context = "SPARQL update"
     else:
         raise ValueError(
             f"Unexpected parser type: {parser_type}. Must be one of {ParserType}"
         )
 
-    tree = _parser.parse(query)
+    try:
+        tree = _parser.parse(query)
+    except (LarkError, UnexpectedInput) as e:
+        raise _wrap_lark_error(e, context) from e
 
     serializer = SparqlSerializer()
     serializer.visit_topdown(tree)
 
     return serializer.result
+
+
+def format_query(query: str) -> str:
+    """Parse and format a SPARQL query.
+
+    This is a convenience function equivalent to format_string_explicit(query, "sparql").
+
+    :param query: Input SPARQL query string.
+    :return: Formatted query.
+    :raises SparqlSyntaxError: If the query has a syntax error.
+    """
+    return format_string_explicit(query, parser_type="sparql")
+
+
+def format_update(query: str) -> str:
+    """Parse and format a SPARQL update.
+
+    This is a convenience function equivalent to format_string_explicit(query, "sparql_update").
+
+    :param query: Input SPARQL update string.
+    :return: Formatted update.
+    :raises SparqlSyntaxError: If the update has a syntax error.
+    """
+    return format_string_explicit(query, parser_type="sparql_update")
+
+
+def validate_query(query: str) -> bool:
+    """Validate a SPARQL query without serializing it.
+
+    This is a convenience function equivalent to validate(query, "sparql").
+
+    :param query: Input SPARQL query string.
+    :return: True if the query is valid.
+    :raises SparqlSyntaxError: If the query has a syntax error.
+    """
+    return validate(query, parser_type="sparql")
+
+
+def validate_update(query: str) -> bool:
+    """Validate a SPARQL update without serializing it.
+
+    This is a convenience function equivalent to validate(query, "sparql_update").
+
+    :param query: Input SPARQL update string.
+    :return: True if the update is valid.
+    :raises SparqlSyntaxError: If the update has a syntax error.
+    """
+    return validate(query, parser_type="sparql_update")

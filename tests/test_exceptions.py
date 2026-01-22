@@ -96,3 +96,72 @@ def test_validate_query_error_preserved_when_both_fail():
     with pytest.raises(SparqlSyntaxError) as exc_info:
         validate(invalid_query)
     assert "SPARQL query" in str(exc_info.value)
+
+
+def test_validate_raises_value_error_for_invalid_parser_type():
+    """Ensure validate raises ValueError for invalid parser_type."""
+    with pytest.raises(ValueError) as exc_info:
+        validate("SELECT * WHERE { ?s ?p ?o }", parser_type="invalid")
+    assert "Unexpected parser type" in str(exc_info.value)
+
+
+def test_format_string_explicit_raises_sparql_syntax_error():
+    """Ensure format_string_explicit wraps LarkError in SparqlSyntaxError."""
+    with pytest.raises(SparqlSyntaxError) as exc_info:
+        sparql.format_string_explicit("SELECT * WHERE { ?s ?p ?o", parser_type="sparql")
+    assert "SPARQL query" in str(exc_info.value)
+    assert exc_info.value.original_error is not None
+
+
+def test_format_string_explicit_raises_value_error_for_invalid_parser_type():
+    """Ensure format_string_explicit raises ValueError for invalid parser_type."""
+    with pytest.raises(ValueError) as exc_info:
+        sparql.format_string_explicit("SELECT * WHERE { ?s ?p ?o }", parser_type="invalid")
+    assert "Unexpected parser type" in str(exc_info.value)
+
+
+def test_format_query_convenience_function():
+    """Test format_query convenience function."""
+    result = sparql.format_query("SELECT * WHERE { ?s ?p ?o }")
+    assert "SELECT" in result
+    assert "?s" in result
+
+
+def test_format_query_raises_on_invalid():
+    """Test format_query raises SparqlSyntaxError on invalid query."""
+    with pytest.raises(SparqlSyntaxError):
+        sparql.format_query("SELECT * WHERE { ?s ?p ?o")
+
+
+def test_format_update_convenience_function():
+    """Test format_update convenience function."""
+    result = sparql.format_update("INSERT DATA { <s> <p> <o> }")
+    assert "INSERT" in result
+
+
+def test_format_update_raises_on_invalid():
+    """Test format_update raises SparqlSyntaxError on invalid update."""
+    with pytest.raises(SparqlSyntaxError):
+        sparql.format_update("INSERT DATA { <s> <p> <o>")
+
+
+def test_validate_query_convenience_function():
+    """Test validate_query convenience function."""
+    assert sparql.validate_query("SELECT * WHERE { ?s ?p ?o }") is True
+
+
+def test_validate_query_raises_on_invalid():
+    """Test validate_query raises SparqlSyntaxError on invalid query."""
+    with pytest.raises(SparqlSyntaxError):
+        sparql.validate_query("SELECT * WHERE { ?s ?p ?o")
+
+
+def test_validate_update_convenience_function():
+    """Test validate_update convenience function."""
+    assert sparql.validate_update("INSERT DATA { <s> <p> <o> }") is True
+
+
+def test_validate_update_raises_on_invalid():
+    """Test validate_update raises SparqlSyntaxError on invalid update."""
+    with pytest.raises(SparqlSyntaxError):
+        sparql.validate_update("INSERT DATA { <s> <p> <o>")

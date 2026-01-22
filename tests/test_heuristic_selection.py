@@ -40,6 +40,10 @@ def test_guess_parser_type_ambiguous():
     query = "SELECT * WHERE { ?s ?p 'INSERT' }"
     assert _guess_parser_type(query) == "sparql"
 
+    # Update query with SELECT in a string (should be identified as update)
+    query_update = "INSERT DATA { <s> <p> 'SELECT' }"
+    assert _guess_parser_type(query_update) == "sparql_update"
+
 
 def test_format_string_uses_heuristic_success():
     """Test that format_string uses the heuristic and succeeds."""

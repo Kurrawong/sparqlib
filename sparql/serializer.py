@@ -688,14 +688,19 @@ class SparqlSerializer:
         ]
 
         for base_decl in base_decls:
-            base_token = base_decl.children[0].children[0]
-            iriref_token = base_decl.children[1]
+            base_node = _safe_get_child(base_decl, 0, Tree, "base_decl")
+            base_token = _safe_get_child(base_node, 0, Token, "base")
+            iriref_token = _safe_get_child(base_decl, 1, Token, "base_decl.iriref")
             self._parts.append(f"{base_token.value} {iriref_token.value}\n")
 
         for prefix_decl in prefix_decls:
-            prefix_token = prefix_decl.children[0].children[0]
-            pname_ns_token = prefix_decl.children[1].children[0]
-            iriref_token = prefix_decl.children[2]
+            prefix_node = _safe_get_child(prefix_decl, 0, Tree, "prefix_decl")
+            prefix_token = _safe_get_child(prefix_node, 0, Token, "prefix")
+            pname_ns_node = _safe_get_child(
+                prefix_decl, 1, Tree, "prefix_decl.pname_ns"
+            )
+            pname_ns_token = _safe_get_child(pname_ns_node, 0, Token, "pname_ns")
+            iriref_token = _safe_get_child(prefix_decl, 2, Token, "prefix_decl.iriref")
             self._parts.append(
                 f"{prefix_token.value} {pname_ns_token.value} {iriref_token.value}\n"
             )
@@ -1031,15 +1036,18 @@ class SparqlSerializer:
         return True
 
     def _bind_enter(self, tree: Tree, context: dict[str, Any]) -> bool:
-        bind_token = tree.children[0]
-        as_token = tree.children[2]
+        bind_token = _safe_get_child(tree, 0, Token, "bind")
+        expression = _safe_get_child(tree, 1, Tree, "bind.expression")
+        as_token = _safe_get_child(tree, 2, Token, "bind")
+        var = _safe_get_child(tree, 3, Tree, "bind.var")
+
         self._parts.append(f"{'	' * self._indent}{bind_token.value} (")
         self._stack.append((Token("RPAR", ") "), TraversalPhase.ENTER, context))
-        self._stack.append((tree.children[3], TraversalPhase.ENTER, context))
+        self._stack.append((var, TraversalPhase.ENTER, context))
         self._stack.append(
             (Token("AS", f" {as_token.value} "), TraversalPhase.ENTER, context)
         )
-        self._stack.append((tree.children[1], TraversalPhase.ENTER, context))
+        self._stack.append((expression, TraversalPhase.ENTER, context))
         return True
 
     def _inline_data_enter(self, tree: Tree, context: dict[str, Any]) -> bool:
@@ -1466,7 +1474,8 @@ class SparqlSerializer:
         return False
 
     def _string_enter(self, tree: Tree, context: dict[str, Any]) -> bool:
-        self._parts.append(f"{tree.children[0].value} ")
+        child = _safe_get_child(tree, 0, Token, "string")
+        self._parts.append(f"{child.value} ")
         return True
 
     def _iri_enter(self, tree: Tree, context: dict[str, Any]) -> bool:
@@ -1500,17 +1509,20 @@ class SparqlSerializer:
         return True
 
     def _numeric_literal_enter(self, tree: Tree, context: dict[str, Any]) -> bool:
-        val = tree.children[0].children[0]
+        child_tree = _safe_get_child(tree, 0, Tree, "numeric_literal")
+        val = _safe_get_child(child_tree, 0, Token, "numeric_literal.value")
         self._parts.append(f"{val.value} ")
         return True
 
     def _boolean_literal_enter(self, tree: Tree, context: dict[str, Any]) -> bool:
-        val = tree.children[0].children[0]
+        child_tree = _safe_get_child(tree, 0, Tree, "boolean_literal")
+        val = _safe_get_child(child_tree, 0, Token, "boolean_literal.value")
         self._parts.append(f"{val.value} ")
         return True
 
     def _blank_node_enter(self, tree: Tree, context: dict[str, Any]) -> bool:
-        self._parts.append(f"{tree.children[0].value} ")
+        child = _safe_get_child(tree, 0, Token, "blank_node")
+        self._parts.append(f"{child.value} ")
         return True
 
     def _anon_enter(self, tree: Tree, context: dict[str, Any]) -> bool:
@@ -1526,11 +1538,13 @@ class SparqlSerializer:
         return True
 
     def _iriref_enter(self, tree: Tree, context: dict[str, Any]) -> bool:
-        self._parts.append(f"{tree.children[0].value} ")
+        child = _safe_get_child(tree, 0, Token, "iriref")
+        self._parts.append(f"{child.value} ")
         return True
 
     def _prefixed_name_enter(self, tree: Tree, context: dict[str, Any]) -> bool:
-        self._parts.append(f"{tree.children[0].value} ")
+        child = _safe_get_child(tree, 0, Token, "prefixed_name")
+        self._parts.append(f"{child.value} ")
         return True
 
     def _inline_data_one_var_enter(self, tree: Tree, context: dict[str, Any]) -> bool:

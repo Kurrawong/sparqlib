@@ -54,12 +54,29 @@ def _contains(pattern: str, text: str) -> bool:
     return True if re.search(pattern, text, re.IGNORECASE) is not None else False
 
 
+def _remove_noise(text: str) -> str:
+    """Remove comments, strings, and IRIs from the query text."""
+    # Pattern for removing comments, strings, and IRIs
+    # 1. Comments: #.*
+    # 2. Strings: "..." or '...' (handling escaped quotes)
+    # 3. IRIs: <...>
+    pattern = r"""
+        \#.*$                     |  # Comments
+        "[^"\\]*(?:\\.[^"\\]*)*"  |  # Double quoted strings
+        '[^'\\]*(?:\\.[^'\\]*)*'  |  # Single quoted strings
+        <[^>]*>                      # IRIs (simplified)
+    """
+    return re.sub(pattern, " ", text, flags=re.VERBOSE | re.MULTILINE)
+
+
 def _guess_parser_type(query: str) -> ParserType:
     """Guess the parser type based on keywords in the query.
 
     This is a heuristic to improve performance by trying the most likely
     parser first. It is not guaranteed to be correct.
     """
+    clean_query = _remove_noise(query)
+
     # specific keywords that strongly suggest an UPDATE query
     # Note: INSERT/DELETE can occur in CONSTRUCT/subqueries (though usually as 'INSERT DATA' etc for updates)
     # But as top-level keywords, they indicate Update.
@@ -72,8 +89,8 @@ def _guess_parser_type(query: str) -> ParserType:
     # Query keywords
     query_keywords = r"(?i)\b(SELECT|CONSTRUCT|ASK|DESCRIBE)\b"
 
-    has_update = _contains(update_keywords, query)
-    has_query = _contains(query_keywords, query)
+    has_update = _contains(update_keywords, clean_query)
+    has_query = _contains(query_keywords, clean_query)
 
     if has_update and not has_query:
         return "sparql_update"

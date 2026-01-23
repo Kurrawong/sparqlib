@@ -379,7 +379,6 @@ class SparqlSerializer(IterativeTreeVisitor):
         >>> print(serializer.visit_topdown(tree))
     """
 
-    INDENT_STR = "    "
     # Prevent pathological output growth for extremely deep nesting (e.g. tests
     # that intentionally exceed recursion limits). Without a cap, indentation
     # grows with nesting depth, which can make the serialized string enormous
@@ -497,9 +496,10 @@ class SparqlSerializer(IterativeTreeVisitor):
         }
     )
 
-    def __init__(self, preserve_comments: bool = True):
+    def __init__(self, preserve_comments: bool = True, indent: str = "  "):
         super().__init__()
         self._preserve_comments: bool = preserve_comments
+        self._indent_str: str = indent
         self._comment_map: dict[Any, Any] | None = None
         self._comment_token_id_to_index: dict[int, int] = {}
         self._emitted_comment_indices: set[int] = set()
@@ -666,7 +666,7 @@ class SparqlSerializer(IterativeTreeVisitor):
         level = self._indent + extra
         if level > self.MAX_INDENT_LEVEL:
             level = self.MAX_INDENT_LEVEL
-        return self.INDENT_STR * level
+        return self._indent_str * level
 
     def _at_line_start(self) -> bool:
         last_char = self._last_char()

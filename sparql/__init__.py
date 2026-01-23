@@ -98,8 +98,6 @@ def normalize_keyword_tokens(
 def validate(
     query: str,
     parser_type: ParserType | None = None,
-    *,
-    strict: bool = False,
 ) -> bool:
     """Validate a SPARQL query without serializing it.
 
@@ -110,8 +108,6 @@ def validate(
 
     :param query: Input query string.
     :param parser_type: Optional parser type. If provided, only that parser is used.
-    :param strict: Reserved for backwards compatibility; has no effect when
-        parser_type is None.
     :return: True if the query is valid.
     :raises SparqlSyntaxError: If the query has a syntax error.
     :raises ValueError: If parser_type is not None, "sparql", or "sparql_update".
@@ -145,8 +141,8 @@ def format_string(
     query: str,
     parser_type: ParserType | None = None,
     *,
-    strict: bool = False,
     preserve_comments: bool = True,
+    indent: str = "  ",
 ) -> str:
     """Parse the input string and return a formatted version of it.
 
@@ -154,13 +150,18 @@ def format_string(
 
     :param query: Input query string.
     :param parser_type: Optional parser type. If provided, only that parser is used.
-    :param strict: Reserved for backwards compatibility; has no effect when
-        parser_type is None.
+    :param preserve_comments: Whether to preserve comments in the output.
+    :param indent: The string to use for each level of indentation.
     :return: Formatted query.
     :raises SparqlSyntaxError: If the query has a syntax error.
     """
     if parser_type is not None:
-        return format_string_explicit(query, parser_type=parser_type)
+        return format_string_explicit(
+            query,
+            parser_type=parser_type,
+            preserve_comments=preserve_comments,
+            indent=indent,
+        )
 
     try:
         if preserve_comments:
@@ -171,7 +172,7 @@ def format_string(
     except (LarkError, UnexpectedInput) as e:
         raise _wrap_lark_error(e, "SPARQL query/update") from e
 
-    serializer = SparqlSerializer(preserve_comments=preserve_comments)
+    serializer = SparqlSerializer(preserve_comments=preserve_comments, indent=indent)
     serializer.visit_topdown(tree)
     # Normalize leading/trailing whitespace/newlines so callers get stable output
     # regardless of input surrounding whitespace.
@@ -179,7 +180,11 @@ def format_string(
 
 
 def format_string_explicit(
-    query: str, parser_type: ParserType = "sparql", *, preserve_comments: bool = True
+    query: str,
+    parser_type: ParserType = "sparql",
+    *,
+    preserve_comments: bool = True,
+    indent: str = "  ",
 ) -> str:
     """Parse the input string and return a formatted version of it.
 
@@ -188,6 +193,8 @@ def format_string_explicit(
 
     :param query: Input query string.
     :param parser_type: The parser type, either "sparql" or "sparql_update".
+    :param preserve_comments: Whether to preserve comments in the output.
+    :param indent: The string to use for each level of indentation.
     :return: Formatted query.
     :raises SparqlSyntaxError: If the query has a syntax error.
     :raises ValueError: If parser_type is not "sparql" or "sparql_update".
@@ -212,7 +219,7 @@ def format_string_explicit(
     except (LarkError, UnexpectedInput) as e:
         raise _wrap_lark_error(e, context) from e
 
-    serializer = SparqlSerializer(preserve_comments=preserve_comments)
+    serializer = SparqlSerializer(preserve_comments=preserve_comments, indent=indent)
     serializer.visit_topdown(tree)
 
     # Normalize leading/trailing whitespace/newlines so callers get stable output
@@ -220,30 +227,45 @@ def format_string_explicit(
     return serializer.result.strip()
 
 
-def format_query(query: str) -> str:
+def format_query(
+    query: str, *, preserve_comments: bool = True, indent: str = "  "
+) -> str:
     """Parse and format a SPARQL query.
 
     This is a convenience function equivalent to
     format_string_explicit(query, "sparql").
 
     :param query: Input SPARQL query string.
+    :param preserve_comments: Whether to preserve comments in the output.
+    :param indent: The string to use for each level of indentation.
     :return: Formatted query.
     :raises SparqlSyntaxError: If the query has a syntax error.
     """
-    return format_string_explicit(query, parser_type="sparql")
+    return format_string_explicit(
+        query, parser_type="sparql", preserve_comments=preserve_comments, indent=indent
+    )
 
 
-def format_update(query: str) -> str:
+def format_update(
+    query: str, *, preserve_comments: bool = True, indent: str = "  "
+) -> str:
     """Parse and format a SPARQL update.
 
     This is a convenience function equivalent to
     format_string_explicit(query, "sparql_update").
 
     :param query: Input SPARQL update string.
+    :param preserve_comments: Whether to preserve comments in the output.
+    :param indent: The string to use for each level of indentation.
     :return: Formatted update.
     :raises SparqlSyntaxError: If the update has a syntax error.
     """
-    return format_string_explicit(query, parser_type="sparql_update")
+    return format_string_explicit(
+        query,
+        parser_type="sparql_update",
+        preserve_comments=preserve_comments,
+        indent=indent,
+    )
 
 
 def validate_query(query: str) -> bool:
@@ -350,15 +372,21 @@ def parse_update(query: str, *, preserve_comments: bool = True) -> Tree[Any]:
     )
 
 
-def serialize(tree: Tree[Any], *, preserve_comments: bool = True) -> str:
+def serialize(
+    tree: Tree[Any], *, preserve_comments: bool = True, indent: str = "  "
+) -> str:
     """Serialize a SPARQL AST back to a string.
 
     This function enables round-tripping: parse a query, modify the AST,
     then serialize it back to a string.
 
     :param tree: A lark.Tree representing a parsed SPARQL query or update.
+    :param preserve_comments: Whether to preserve comments in the output.
+    :param indent: The string to use for each level of indentation.
     :return: The serialized SPARQL string.
     """
-    serializer = SparqlSerializer(preserve_comments=preserve_comments)
+    serializer = SparqlSerializer(preserve_comments=preserve_comments, indent=indent)
     serializer.visit_topdown(tree)
-    return serializer.result
+    # Normalize leading/trailing whitespace/newlines so callers get stable output
+    # regardless of input surrounding whitespace.
+    return serializer.result.strip()

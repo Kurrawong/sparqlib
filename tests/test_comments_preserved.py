@@ -86,7 +86,8 @@ class TestCommentsPreserved:
 
         formatted = sparql.format_string(query)
         # Inner SELECT should be indented (it appears under GRAPH -> { -> subselect).
-        assert "\n            SELECT ?x\n" in formatted
+        # With 2-space indent default, 3 levels = 6 spaces.
+        assert "\n      SELECT ?x\n" in formatted
 
     def test_inline_comments_roundtrip_stay_inline(self):
         query = (
@@ -95,8 +96,8 @@ class TestCommentsPreserved:
             "\n"
             "SELECT ?x # test\n"
             "WHERE { # test\n"
-            "    ?x ?p ?g\n"
-            "    FILTER (?x != in:i1) # test\n"
+            "  ?x ?p ?g\n"
+            "  FILTER (?x != in:i1) # test\n"
             "}\n"
         )
 
@@ -111,8 +112,8 @@ class TestCommentsPreserved:
             "SELECT ?x # test\n"
             "WHERE { # test\n"
             "# test\n"
-            "    ?x ?p ?g\n"
-            "    FILTER (?x != in:i1) # test\n"
+            "  ?x ?p ?g\n"
+            "  FILTER (?x != in:i1) # test\n"
             "}\n"
         )
 
@@ -123,9 +124,9 @@ class TestCommentsPreserved:
             "# Test\n"
             "SELECT ?x # test\n"
             "WHERE { # test\n"
-            "    # test\n"
-            "    ?x ?p ?g\n"
-            "    FILTER (?x != in:i1) # test\n"
+            "  # test\n"
+            "  ?x ?p ?g\n"
+            "  FILTER (?x != in:i1) # test\n"
             "}"
         )
 

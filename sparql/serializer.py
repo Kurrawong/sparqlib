@@ -737,6 +737,14 @@ class SparqlSerializer(IterativeTreeVisitor):
         token_value = self._format_keyword_value(token.value)
         if token.type == "DOT_NEWLINE":
             self._no_space_after = False
+            # Some serializer-injected DOT_NEWLINE tokens include a leading space
+            # (e.g. " .\n"). If the previous emitter already ended with whitespace
+            # (like a blank-node close handler appending "] "), drop that leading
+            # space to avoid double spaces ("]  .").
+            if token_value.startswith(" "):
+                last_char = self._last_char()
+                if last_char is not None and last_char.isspace():
+                    token_value = token_value[1:]
             self._parts.append(token_value)
         elif token.type == "SPACE":
             if self._no_space_after:

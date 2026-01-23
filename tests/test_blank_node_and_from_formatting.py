@@ -55,6 +55,14 @@ class TestBlankNodePropertyListFormatting:
         assert "[\n" in result
         assert "\n" in result.split("[")[1].split("]")[0]
 
+    def test_blank_node_followed_by_dot_has_single_space(self):
+        # Trailing '.' is optional for the last triple in a group pattern in SPARQL,
+        # so ensure the '.' is actually required by placing another triple after it.
+        query = "SELECT * WHERE { ?s <p> [ <a> <b> ] . ?s <q> <r> }"
+        result = format_query(query)
+        assert "] ." in result
+        assert "]  ." not in result
+
     def test_blank_node_properties_on_separate_lines(self):
         query = "SELECT * WHERE { ?s <p> [ <a> <b> ; <c> <d> ] }"
         result = format_query(query)

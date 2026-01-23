@@ -28,3 +28,11 @@ def test_values_two_vars_each_row_on_own_line():
     assert (
         "  VALUES (?g ?g2) {\n    (<urn:g1> <urn:g2>)\n    (<urn:g3> <urn:g4>)\n  }\n"
     ) in formatted
+
+
+def test_values_block_does_not_run_into_following_triples_block():
+    query = "SELECT * WHERE { VALUES ?x { <urn:a> } ?s ?p ?x }"
+    formatted = sparql.format_string(query)
+
+    assert "  }\n  ?s ?p ?x" in formatted
+    assert "}  ?s ?p ?x" not in formatted

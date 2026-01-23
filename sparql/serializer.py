@@ -1548,7 +1548,30 @@ class SparqlSerializer(IterativeTreeVisitor):
         if not self._at_line_start():
             self._trim_trailing_space()
             self._parts.append("\n")
-        for child in reversed(tree.children):
+
+        # `group_graph_pattern_sub_other` has the grammar shape:
+        #   graph_pattern_not_triples DOT? triples_block?
+        #
+        # When a `graph_pattern_not_triples` (e.g. inline_data / VALUES) is followed
+        # by DOT and/or a `triples_block`, ensure we start the following part on a
+        # new line so we don't end up with `}  ?s ?p ?o`.
+        children_to_emit: list[Tree[Any] | Token] = []
+        for i, child in enumerate(tree.children):
+            children_to_emit.append(child)
+            if (
+                i == 0
+                and isinstance(child, Tree)
+                and child.data == "graph_pattern_not_triples"
+                and i + 1 < len(tree.children)
+            ):
+                next_child = tree.children[i + 1]
+                if (isinstance(next_child, Token) and next_child.type == "DOT") or (
+                    isinstance(next_child, Tree) and next_child.data == "triples_block"
+                ):
+                    # Use RAW newline so token handling trims trailing whitespace.
+                    children_to_emit.append(Token("RAW", "\n"))
+
+        for child in reversed(children_to_emit):
             if isinstance(child, Token) and child.type == "DOT":
                 self._stack.append(
                     (

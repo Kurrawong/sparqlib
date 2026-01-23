@@ -717,6 +717,9 @@ class SparqlSerializer(IterativeTreeVisitor):
             ):
                 return
             self._parts.append(" ")
+        elif token.type == "SELECT_ASTERIX":
+            # Special case for SELECT * - don't strip the leading space
+            self._parts.append(token_value)
         elif token.type == "RAW":
             # Special case: RAW ')' is commonly used by handlers instead of the
             # original token. If there's an inline comment that was after ')',
@@ -894,7 +897,7 @@ class SparqlSerializer(IterativeTreeVisitor):
             },
             "property_list_path_not_empty_other": {
                 "enter": cls._property_list_path_not_empty_other_enter,
-                "exit": None,
+                "exit": cls._property_list_path_not_empty_other_exit,
             },
             "property_list_path_not_empty_rest": {"enter": None, "exit": None},
             "verb_object_list": {"enter": None, "exit": None},
@@ -1264,6 +1267,12 @@ class SparqlSerializer(IterativeTreeVisitor):
                 self._stack.append(
                     (Token("RAW", self._indent_prefix()), TraversalPhase.ENTER, context)
                 )
+            elif token.type == "ASTERIX":
+                # Ensure space before ASTERIX (e.g., "SELECT *" not "SELECT*")
+                # Use SELECT_ASTERIX type to avoid _NO_SPACE_BEFORE stripping
+                self._stack.append(
+                    (Token("SELECT_ASTERIX", "*"), TraversalPhase.ENTER, context)
+                )
             else:
                 self._stack.append((token, TraversalPhase.ENTER, context))
 
@@ -1295,6 +1304,11 @@ class SparqlSerializer(IterativeTreeVisitor):
         from_token = self._find_token(tree, "FROM")
         named_token = self._find_token(tree, "NAMED")
 
+        # Each FROM clause should start on a new line
+        self._trim_trailing_space()
+        if not self._at_line_start():
+            self._parts.append("\n")
+
         if from_token:
             self._emit_anchored_comments_for_token(from_token)
             from_value = self._format_keyword_value(from_token.value)
@@ -1314,7 +1328,6 @@ class SparqlSerializer(IterativeTreeVisitor):
 
     def _dataset_clause_exit(self, tree: Tree[Any], context: dict[str, Any]) -> None:
         self._trim_trailing_space()
-        self._parts.append("\n")
 
     def _group_clause_enter(self, tree: Tree[Any], context: dict[str, Any]) -> bool:
         group_token = self._find_token(tree, "GROUP")
@@ -1470,7 +1483,13 @@ class SparqlSerializer(IterativeTreeVisitor):
         for i in range(len(verb_object_lists) - 1, -1, -1):
             self._stack.append((verb_object_lists[i], TraversalPhase.ENTER, context))
             if i > 0:
-                self._stack.append((Token("RAW", "; "), TraversalPhase.ENTER, context))
+                self._stack.append(
+                    (
+                        Token("RAW", f";\n{self._indent_prefix()}"),
+                        TraversalPhase.ENTER,
+                        context,
+                    )
+                )
         return True
 
     def _construct_triples_template_exit(
@@ -1717,8 +1736,14 @@ class SparqlSerializer(IterativeTreeVisitor):
     def _property_list_path_not_empty_other_enter(
         self, tree: Tree[Any], context: dict[str, Any]
     ) -> bool:
-        self._parts.append(f";\n{self._indent_prefix(1)}")
+        self._indent += 1
+        self._parts.append(f";\n{self._indent_prefix()}")
         return False
+
+    def _property_list_path_not_empty_other_exit(
+        self, tree: Tree[Any], context: dict[str, Any]
+    ) -> None:
+        self._indent -= 1
 
     def _verb_enter(self, tree: Tree[Any], context: dict[str, Any]) -> bool:
         val = tree.children[0]
@@ -1849,12 +1874,16 @@ class SparqlSerializer(IterativeTreeVisitor):
     def _blank_node_property_list_path_enter(
         self, tree: Tree[Any], context: dict[str, Any]
     ) -> None:
-        self._parts.append("[")
+        self._parts.append("[\n")
+        self._indent += 1
+        self._parts.append(self._indent_prefix())
 
     def _blank_node_property_list_path_exit(
         self, tree: Tree[Any], context: dict[str, Any]
     ) -> None:
-        self._parts.append("] ")
+        self._indent -= 1
+        self._trim_trailing_space()
+        self._parts.append(f"\n{self._indent_prefix()}] ")
 
     def _collection_enter(self, tree: Tree[Any], context: dict[str, Any]) -> None:
         self._parts.append("(")
@@ -1865,12 +1894,16 @@ class SparqlSerializer(IterativeTreeVisitor):
     def _blank_node_property_list_enter(
         self, tree: Tree[Any], context: dict[str, Any]
     ) -> None:
-        self._parts.append("[")
+        self._parts.append("[\n")
+        self._indent += 1
+        self._parts.append(self._indent_prefix())
 
     def _blank_node_property_list_exit(
         self, tree: Tree[Any], context: dict[str, Any]
     ) -> None:
-        self._parts.append("] ")
+        self._indent -= 1
+        self._trim_trailing_space()
+        self._parts.append(f"\n{self._indent_prefix()}] ")
 
     def _conditional_or_expression_enter(
         self, tree: Tree[Any], context: dict[str, Any]

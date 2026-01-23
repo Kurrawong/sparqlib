@@ -7,7 +7,7 @@ well beyond Python's default recursion limit.
 import pytest
 from lark import Token, Tree
 
-from sparql.parser import sparql_parser
+from sparql.parser import sparql_query_parser
 from sparql.serializer import SparqlSerializer, get_value
 
 
@@ -38,7 +38,7 @@ def test_deeply_nested_optionals():
     query = (
         "SELECT * WHERE { " + "OPTIONAL { " * depth + "?s ?p ?o" + " } " * depth + "}"
     )
-    tree = sparql_parser.parse(query)
+    tree = sparql_query_parser.parse(query)
 
     serializer = SparqlSerializer()
     result = serializer.visit_topdown(tree)
@@ -49,7 +49,7 @@ def test_deeply_nested_optionals():
     assert "OPTIONAL" in flat_result
 
     # Roundtrip check
-    tree2 = sparql_parser.parse(result)
+    tree2 = sparql_query_parser.parse(result)
     assert iterative_tree_eq(tree, tree2)
 
 
@@ -57,7 +57,7 @@ def test_deeply_nested_expressions():
     """Test serializer handles deeply nested bracket expressions."""
     depth = 2000
     query = "SELECT * WHERE { BIND(" + "(" * depth + "1 + 1" + ")" * depth + " AS ?x) }"
-    tree = sparql_parser.parse(query)
+    tree = sparql_query_parser.parse(query)
 
     serializer = SparqlSerializer()
     result = serializer.visit_topdown(tree)
@@ -65,7 +65,7 @@ def test_deeply_nested_expressions():
     assert "1+1" in flat_result
 
     # Roundtrip
-    tree2 = sparql_parser.parse(result)
+    tree2 = sparql_query_parser.parse(result)
     assert iterative_tree_eq(tree, tree2)
 
 
@@ -73,7 +73,7 @@ def test_deeply_nested_unions():
     """Test serializer handles deeply nested group graph patterns."""
     depth = 1000
     query = "SELECT * WHERE { " + "{ " * depth + "?s ?p ?o" + " } " * depth + "}"
-    tree = sparql_parser.parse(query)
+    tree = sparql_query_parser.parse(query)
 
     serializer = SparqlSerializer()
     result = serializer.visit_topdown(tree)
@@ -81,7 +81,7 @@ def test_deeply_nested_unions():
     assert "?s?p?o" in flat_result
 
     # Roundtrip
-    tree2 = sparql_parser.parse(result)
+    tree2 = sparql_query_parser.parse(result)
     assert iterative_tree_eq(tree, tree2)
 
 
@@ -95,7 +95,7 @@ def test_deeply_nested_subselects():
         + " } } " * depth
         + "}"
     )
-    tree = sparql_parser.parse(query)
+    tree = sparql_query_parser.parse(query)
 
     serializer = SparqlSerializer()
     result = serializer.visit_topdown(tree)
@@ -103,7 +103,7 @@ def test_deeply_nested_subselects():
     assert "?s?p?o" in flat_result
 
     # Roundtrip
-    tree2 = sparql_parser.parse(result)
+    tree2 = sparql_query_parser.parse(result)
     assert iterative_tree_eq(tree, tree2)
 
 
@@ -115,13 +115,13 @@ def test_complex_combined_nesting():
         inner = f"OPTIONAL {{ GRAPH ?g {{ {inner} }} }}"
 
     query = f"SELECT * WHERE {{ {inner} }}"
-    tree = sparql_parser.parse(query)
+    tree = sparql_query_parser.parse(query)
 
     serializer = SparqlSerializer()
     result = serializer.visit_topdown(tree)
 
     # Roundtrip
-    tree2 = sparql_parser.parse(result)
+    tree2 = sparql_query_parser.parse(result)
     assert iterative_tree_eq(tree, tree2)
 
 

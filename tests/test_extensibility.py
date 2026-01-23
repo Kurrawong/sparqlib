@@ -3,7 +3,7 @@
 import pytest
 from lark import Token, Tree
 
-from sparql.parser import sparql_parser
+from sparql.parser import sparql_query_parser
 from sparql.serializer import SparqlSerializer
 
 
@@ -45,7 +45,7 @@ class ExtendedSerializer(SparqlSerializer):
 def test_subclass_can_override_handler():
     """Verify a subclass can override existing handlers."""
     query = "SELECT ?x WHERE { ?x ?p ?o }"
-    tree = sparql_parser.parse(query)
+    tree = sparql_query_parser.parse(query)
 
     # Base serializer should produce lowercase variables
     base_ser = SparqlSerializer()
@@ -64,7 +64,7 @@ def test_subclass_can_override_handler():
 def test_base_class_unaffected_by_subclass():
     """Verify base class maintains its handlers independently after subclass instantiation."""
     query = "SELECT ?x WHERE { ?s ?p ?o }"
-    tree = sparql_parser.parse(query)
+    tree = sparql_query_parser.parse(query)
 
     # First create a custom serializer (this will populate _handler_cache for CustomSerializer)
     custom_ser = CustomSerializer()
@@ -83,7 +83,7 @@ def test_base_class_unaffected_by_subclass():
 def test_multiple_subclasses_independent():
     """Verify multiple subclasses have independent handler maps."""
     query = "SELECT * WHERE { ?s ?p () }"  # Query with NIL
-    tree = sparql_parser.parse(query)
+    tree = sparql_query_parser.parse(query)
 
     custom_ser = CustomSerializer()
     extended_ser = ExtendedSerializer()

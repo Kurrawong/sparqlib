@@ -4,7 +4,11 @@ from lark import Token, Tree
 from lark.exceptions import LarkError, UnexpectedInput
 
 from sparql.comments import attach_comments, scan_raw_comments
-from sparql.parser import sparql_parser, sparql_unit_parser, sparql_update_parser
+from sparql.parser import (
+    sparql_parser,
+    sparql_query_parser,
+    sparql_update_parser,
+)
 from sparql.serializer import SparqlSerializer
 
 ParserType = Literal["sparql", "sparql_update"]
@@ -115,14 +119,14 @@ def validate(
     """
     if parser_type is None:
         try:
-            sparql_unit_parser.parse(query)
+            sparql_parser.parse(query)
             return True
         except (LarkError, UnexpectedInput) as e:
             raise _wrap_lark_error(e, "SPARQL query/update") from e
 
     if parser_type == "sparql":
         try:
-            sparql_parser.parse(query)
+            sparql_query_parser.parse(query)
             return True
         except (LarkError, UnexpectedInput) as e:
             raise _wrap_lark_error(e, "SPARQL query") from e
@@ -161,10 +165,10 @@ def format_string(
 
     try:
         if preserve_comments:
-            tree = sparql_unit_parser.parse(query)
+            tree = sparql_parser.parse(query)
             attach_comments(tree, scan_raw_comments(query))
         else:
-            tree = sparql_unit_parser.parse(query)
+            tree = sparql_parser.parse(query)
     except (LarkError, UnexpectedInput) as e:
         raise _wrap_lark_error(e, "SPARQL query/update") from e
 
@@ -187,7 +191,7 @@ def format_string_explicit(
     :raises ValueError: If parser_type is not "sparql" or "sparql_update".
     """
     if parser_type == "sparql":
-        _parser = sparql_parser
+        _parser = sparql_query_parser
         context = "SPARQL query"
     elif parser_type == "sparql_update":
         _parser = sparql_update_parser
@@ -283,20 +287,20 @@ def parse(
     if parser_type is None:
         try:
             if preserve_comments:
-                tree = sparql_unit_parser.parse(query)
+                tree = sparql_parser.parse(query)
                 attach_comments(tree, scan_raw_comments(query))
                 return tree
-            return sparql_unit_parser.parse(query)
+            return sparql_parser.parse(query)
         except (LarkError, UnexpectedInput) as e:
             raise _wrap_lark_error(e, "SPARQL query/update") from e
 
     if parser_type == "sparql":
         try:
             if preserve_comments:
-                tree = sparql_parser.parse(query)
+                tree = sparql_query_parser.parse(query)
                 attach_comments(tree, scan_raw_comments(query))
                 return tree
-            return sparql_parser.parse(query)
+            return sparql_query_parser.parse(query)
         except (LarkError, UnexpectedInput) as e:
             raise _wrap_lark_error(e, "SPARQL query") from e
     elif parser_type == "sparql_update":

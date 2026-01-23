@@ -1,4 +1,4 @@
-from sparql.parser import sparql_parser
+from sparql.parser import sparql_query_parser
 from sparql.serializer import SparqlSerializer
 
 
@@ -6,7 +6,7 @@ def test_minimal_serialization():
     # A very simple query that only needs basic structure
     # Note: Since we only have query_unit handler, it will mostly just print tokens.
     query = "SELECT * WHERE { ?s ?p ?o }"
-    tree = sparql_parser.parse(query)
+    tree = sparql_query_parser.parse(query)
 
     serializer = SparqlSerializer()
     result = serializer.visit_topdown(tree)
@@ -20,7 +20,7 @@ def test_minimal_serialization():
 
 def test_serializer_spacing_punctuation():
     query = "SELECT (STR(?s) AS ?x) WHERE { GRAPH <http://example.org/g1> { ?s ?p ?o } }"
-    tree = sparql_parser.parse(query)
+    tree = sparql_query_parser.parse(query)
 
     serializer = SparqlSerializer()
     result = serializer.visit_topdown(tree)
@@ -39,7 +39,7 @@ def test_serializer_spacing_functions():
             FILTER(REGEX(?s, "a"))
         }
     """
-    tree = sparql_parser.parse(query)
+    tree = sparql_query_parser.parse(query)
 
     serializer = SparqlSerializer()
     result = serializer.visit_topdown(tree)

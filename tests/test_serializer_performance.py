@@ -10,7 +10,7 @@ from pathlib import Path
 
 import pytest
 
-from sparql.parser import sparql_parser
+from sparql.parser import sparql_query_parser
 from sparql.serializer import SparqlSerializer
 
 SPEC_DATA_DIR = Path(__file__).parent / "data/sparql_spec_examples"
@@ -95,7 +95,7 @@ def test_performance_benchmark():
     test_cases.append(("Broad (100 triples)", generate_broad_query(100)))
 
     for label, query_str in test_cases:
-        tree = sparql_parser.parse(query_str)
+        tree = sparql_query_parser.parse(query_str)
         time_ms, peak_mem = benchmark_serializer(tree)
         print(f"{label:<30} | {time_ms:>10.2f} | {peak_mem:>15.2f}")
 
@@ -109,7 +109,7 @@ def test_deep_nesting_performance():
     """
     depth = 300
     query = generate_nested_query(depth)
-    tree = sparql_parser.parse(query)
+    tree = sparql_query_parser.parse(query)
 
     start = time.perf_counter()
     serializer = SparqlSerializer()
@@ -135,7 +135,7 @@ def test_memory_efficiency():
     manages its internal state.
     """
     query = generate_nested_query(100)
-    tree = sparql_parser.parse(query)
+    tree = sparql_query_parser.parse(query)
 
     tracemalloc.start()
 
@@ -174,7 +174,7 @@ def test_performance_on_complex_queries():
     ]
 
     for label, query_str in complex_queries:
-        tree = sparql_parser.parse(query_str)
+        tree = sparql_query_parser.parse(query_str)
         time_ms, _ = benchmark_serializer(tree, iterations=100)
 
         # Simple sanity check - should complete within 10ms per iteration

@@ -4,7 +4,7 @@ import lark
 import pytest
 
 from sparql import normalize_keyword_tokens
-from sparql.parser import sparql_parser, sparql_update_parser
+from sparql.parser import sparql_query_parser, sparql_update_parser
 from sparql.serializer import SparqlSerializer
 
 TEST_DIR = Path(__file__).parent
@@ -16,7 +16,7 @@ def test_roundtrip():
         with open(filename, "r", encoding="utf-8") as file:
             query = file.read()
 
-            parser = sparql_parser
+            parser = sparql_query_parser
             try:
                 tree = parser.parse(query)
             except (

@@ -56,10 +56,10 @@ Notes:
 For advanced usage with the AST:
 
 ```python
-from sparql.parser import sparql_parser
+from sparql.parser import sparql_query_parser
 from sparql.serializer import SparqlSerializer
 
-tree = sparql_parser.parse(query)
+tree = sparql_query_parser.parse(query)
 serializer = SparqlSerializer()
 result = serializer.visit_topdown(tree)
 print(result)
@@ -74,7 +74,7 @@ The SPARQL serializer uses an iterative stack-based approach, allowing serializa
 #### Deep Nesting Example
 
 ```python
-from sparql.parser import sparql_parser
+from sparql.parser import sparql_query_parser
 from sparql.serializer import SparqlSerializer
 
 # Create a deeply nested query string
@@ -82,7 +82,7 @@ depth = 2000
 query = "SELECT * WHERE { " + ("OPTIONAL { " * depth) + "?s ?p ?o" + (" }" * depth) + " }"
 
 # Parse and serialize (no RecursionError)
-tree = sparql_parser.parse(query)
+tree = sparql_query_parser.parse(query)
 serializer = SparqlSerializer()
 result = serializer.visit_topdown(tree)
 print(f"Successfully serialized query with nesting depth {depth}")

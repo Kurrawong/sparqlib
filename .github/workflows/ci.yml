@@ -1,6 +1,8 @@
 name: CI
 
 on:
+  push:
+    branches: [main]
   pull_request:
     types: [opened, synchronize, reopened]
 
@@ -74,16 +76,17 @@ jobs:
       - name: Install project
         run: uv sync
 
-      - name: Run tests with coverage and parallel execution
-        run: uv run pytest -v --cov=sparql --cov-report=xml --cov-report=html
+      - name: Run tests with coverage
+        run: uv run pytest -v --cov=sparql
+
+      - name: Rename coverage file
+        run: mv .coverage .coverage-${{ matrix.python-version }}
 
       - name: Upload coverage artifacts
         uses: actions/upload-artifact@v4
         with:
           name: coverage-python-${{ matrix.python-version }}
-          path: |
-            coverage.xml
-            htmlcov/
+          path: .coverage-${{ matrix.python-version }}
           retention-days: 7
 
   coverage-report:
@@ -115,7 +118,7 @@ jobs:
 
       - name: Combine coverage reports
         run: |
-          coverage combine
+          coverage combine .coverage-*
           coverage xml
           coverage html
           coverage report

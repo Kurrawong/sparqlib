@@ -508,6 +508,7 @@ class SparqlSerializer(IterativeTreeVisitor):
         self._inline_after_close_paren: dict[int, list[str]] = {}
         self._open_brace_index: int = 0
         self._close_paren_index: int = 0
+        self._pending_inline_comments_before_semicolon: list[str] | None = None
 
     def visit_topdown(self, tree: Tree[Any]) -> str:
         # Reset comment state per-visit.
@@ -519,6 +520,7 @@ class SparqlSerializer(IterativeTreeVisitor):
         self._inline_after_close_paren = {}
         self._open_brace_index = 0
         self._close_paren_index = 0
+        self._pending_inline_comments_before_semicolon = None
 
         if self._preserve_comments and hasattr(tree, "meta"):
             comment_map = getattr(tree.meta, "sparql_comments", None)
@@ -554,6 +556,12 @@ class SparqlSerializer(IterativeTreeVisitor):
 
         return self.result
 
+    def _peek_next_enter_node(self) -> Tree[Any] | Token | None:
+        for node, phase, _context in reversed(self._stack):
+            if phase == TraversalPhase.ENTER:
+                return node
+        return None
+
     def _emit_inline_comments_after_token(self, token: Token) -> None:
         if not self._preserve_comments:
             return
@@ -563,6 +571,30 @@ class SparqlSerializer(IterativeTreeVisitor):
         comments = self._inline_after_token.get(idx)
         if not comments:
             return
+
+        # If the next emitted node is a serializer-injected semicolon delimiter,
+        # delay emitting the inline comment so it can appear after the semicolon:
+        #   ... obj ; # comment
+        # rather than:
+        #   ... obj # comment
+        #   ;
+        next_node = self._peek_next_enter_node()
+        if self._pending_inline_comments_before_semicolon is None and (
+            (
+                isinstance(next_node, Token)
+                and next_node.type == "RAW"
+                and isinstance(next_node.value, str)
+                and next_node.value.startswith(";")
+                and "\n" in next_node.value
+            )
+            or (
+                isinstance(next_node, Tree)
+                and next_node.data == "property_list_path_not_empty_other"
+            )
+        ):
+            self._pending_inline_comments_before_semicolon = list(comments)
+            return
+
         # Inline comments must end the line.
         self._trim_trailing_space()
         for c in comments:
@@ -721,6 +753,23 @@ class SparqlSerializer(IterativeTreeVisitor):
             # Special case for SELECT * - don't strip the leading space
             self._parts.append(token_value)
         elif token.type == "RAW":
+            if (
+                self._pending_inline_comments_before_semicolon
+                and isinstance(token_value, str)
+                and token_value.startswith(";")
+                and "\n" in token_value
+            ):
+                head, tail = token_value.split("\n", 1)
+                self._parts.append(head)
+                for c in self._pending_inline_comments_before_semicolon:
+                    self._parts.append(f" {c}")
+                self._parts.append("\n")
+                if tail:
+                    self._parts.append(tail)
+                self._pending_inline_comments_before_semicolon = None
+                self._no_space_after = False
+                return
+
             # Special case: RAW ')' is commonly used by handlers instead of the
             # original token. If there's an inline comment that was after ')',
             # emit it here.
@@ -1760,7 +1809,15 @@ class SparqlSerializer(IterativeTreeVisitor):
         self, tree: Tree[Any], context: dict[str, Any]
     ) -> bool:
         self._indent += 1
-        self._parts.append(f";\n{self._indent_prefix()}")
+        if self._pending_inline_comments_before_semicolon:
+            self._parts.append(";")
+            for c in self._pending_inline_comments_before_semicolon:
+                self._parts.append(f" {c}")
+            self._parts.append("\n")
+            self._parts.append(self._indent_prefix())
+            self._pending_inline_comments_before_semicolon = None
+        else:
+            self._parts.append(f";\n{self._indent_prefix()}")
         return False
 
     def _property_list_path_not_empty_other_exit(

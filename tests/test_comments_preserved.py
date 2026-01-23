@@ -132,6 +132,46 @@ class TestCommentsPreserved:
 
         assert sparql.format_string(query) == expected
 
+    def test_inline_comments_after_semicolons_keep_semicolons_inline(self):
+        query = (
+            "PREFIX addr: <https://linked.data.gov.au/def/addr/>\n"
+            "PREFIX la: <https://linked.data.gov.au/def/location-addressing/>\n"
+            "PREFIX sdo: <https://schema.org/>\n"
+            "SELECT (COUNT(DISTINCT ?iri) AS ?count)\n"
+            "WHERE {\n"
+            "  GRAPH ?g {\n"
+            "    ?cr a la:ChangeRequest ;\n"
+            "      sdo:additionalType addr:Address ; # specify the resource type\n"
+            "      sdo:actionStatus "
+            "<https://linked.data.gov.au/def/location-addressing/status/accepted>"
+            " ; # specify the change request status\n"
+            "      sdo:object ?iri .\n"
+            "  }\n"
+            "}\n"
+        )
+
+        expected = (
+            "PREFIX addr: <https://linked.data.gov.au/def/addr/>\n"
+            "PREFIX la: <https://linked.data.gov.au/def/location-addressing/>\n"
+            "PREFIX sdo: <https://schema.org/>\n"
+            "\n"
+            "SELECT (COUNT(DISTINCT ?iri) AS ?count)\n"
+            "WHERE {\n"
+            "  GRAPH ?g {\n"
+            "    ?cr a la:ChangeRequest ;\n"
+            "      sdo:additionalType addr:Address ; # specify the resource type\n"
+            "      sdo:actionStatus "
+            "<https://linked.data.gov.au/def/location-addressing/status/accepted>"
+            " ; # specify the change request status\n"
+            "      sdo:object ?iri\n"
+            "  }\n"
+            "}"
+        )
+
+        formatted = sparql.format_string(query, preserve_comments=True)
+        assert formatted == expected
+        sparql.parse(formatted)
+
 
 @pytest.mark.parametrize(
     "query",

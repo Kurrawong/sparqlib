@@ -1,8 +1,9 @@
 from __future__ import annotations
 
+from collections.abc import Iterable
 from dataclasses import dataclass
 from importlib.resources import files
-from typing import Any, Iterable
+from typing import Any
 
 from lark import Lark, Token, Tree
 
@@ -52,7 +53,7 @@ def _end_pos_fallback(token: Token) -> int | None:
     return start + len(val)
 
 
-def _iter_tokens(tree: Tree) -> Iterable[Token]:
+def _iter_tokens(tree: Tree[Any]) -> Iterable[Token]:
     stack: list[Any] = [tree]
     while stack:
         node = stack.pop()
@@ -64,7 +65,7 @@ def _iter_tokens(tree: Tree) -> Iterable[Token]:
                     stack.append(child)
 
 
-def _significant_tokens_in_source_order(tree: Tree) -> list[Token]:
+def _significant_tokens_in_source_order(tree: Tree[Any]) -> list[Token]:
     tokens = [t for t in _iter_tokens(tree) if t.type != "COMMENT"]
 
     # Sort by stream position if available, otherwise fall back to (line, column)
@@ -136,7 +137,7 @@ def scan_raw_comments(source: str) -> list[RawComment]:
     return raw
 
 
-def attach_comments(tree: Tree, raw_comments: list[RawComment]) -> None:
+def attach_comments(tree: Tree[Any], raw_comments: list[RawComment]) -> None:
     """Attach comment metadata to a parsed tree for later serialization.
 
     This does not change the tree structure; it records comments and anchors them

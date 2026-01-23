@@ -11,12 +11,14 @@ tasks:
     cmds:
       - uv run ruff format --check {{.package_name}} tests
       - uv run ruff check {{.package_name}} tests
+      - uv run mypy {{.package_name}} tests
 
   code:
     desc: Format and standardise code.
     cmds:
       - uv run ruff format {{.package_name}} tests
-      - uv run ruff --fix {{.package_name}} tests
+      - uv run ruff check --fix {{.package_name}} tests
+      - uv run mypy {{.package_name}} tests
 
   test:
     desc: Run Python tests.

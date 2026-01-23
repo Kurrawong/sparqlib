@@ -5,7 +5,10 @@ from sparql.serializer import SparqlSerializer
 
 
 def test_insert_data():
-    query = "INSERT DATA { <http://example.org/s> <http://example.org/p> <http://example.org/o> }"
+    query = (
+        "INSERT DATA { <http://example.org/s> <http://example.org/p> "
+        "<http://example.org/o> }"
+    )
     tree = sparql_update_parser.parse(query)
     serializer = SparqlSerializer()
     result = serializer.visit_topdown(tree)
@@ -26,7 +29,10 @@ def test_delete_where():
 
 
 def test_insert_data_graph():
-    query = "INSERT DATA { GRAPH <http://example.org/g1> { <http://example.org/s> <http://example.org/p> <http://example.org/o> } }"
+    query = (
+        "INSERT DATA { GRAPH <http://example.org/g1> { <http://example.org/s> "
+        "<http://example.org/p> <http://example.org/o> } }"
+    )
 
     tree = sparql_update_parser.parse(query)
 

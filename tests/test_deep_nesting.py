@@ -16,12 +16,14 @@ def iterative_tree_eq(t1, t2):
     stack = [(t1, t2)]
     while stack:
         n1, n2 = stack.pop()
-        if type(n1) != type(n2):
+        if type(n1) is not type(n2):
             return False
         if isinstance(n1, Tree):
             if n1.data != n2.data or len(n1.children) != len(n2.children):
                 return False
-            for c1, c2 in zip(reversed(n1.children), reversed(n2.children)):
+            for c1, c2 in zip(
+                reversed(n1.children), reversed(n2.children), strict=True
+            ):
                 stack.append((c1, c2))
         elif isinstance(n1, Token):
             if n1.type != n2.type or n1.value != n2.value:

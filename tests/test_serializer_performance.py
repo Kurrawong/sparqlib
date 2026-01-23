@@ -27,7 +27,7 @@ QUERIES = [
 def get_query(name):
     """Load a query from the spec examples directory."""
     path = SPEC_DATA_DIR / name
-    with open(path, "r") as f:
+    with open(path) as f:
         return f.read()
 
 
@@ -161,7 +161,8 @@ def test_performance_on_complex_queries():
     complex_queries = [
         (
             "Property paths",
-            "PREFIX foaf: <http://xmlns.com/foaf/0.1/> SELECT * WHERE { ?s foaf:knows+ ?o }",
+            "PREFIX foaf: <http://xmlns.com/foaf/0.1/> SELECT * WHERE { "
+            "?s foaf:knows+ ?o }",
         ),
         (
             "VALUES clause",

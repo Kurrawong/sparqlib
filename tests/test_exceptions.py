@@ -72,7 +72,7 @@ def test_validate_preserves_line_info_when_available():
     with pytest.raises(SparqlSyntaxError) as exc_info:
         validate("SELECT * WHERE { ?s ?p ?o", parser_type="sparql")
     error = exc_info.value
-    assert error.line is not None or error.column is not None or True
+    assert error.line is not None or error.column is not None
 
 
 def test_serializer_error_is_exception():

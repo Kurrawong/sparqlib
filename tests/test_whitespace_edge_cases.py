@@ -51,7 +51,8 @@ class TestBracketSpacing:
     def test_collection_syntax(self):
         query = "SELECT * WHERE { ?s ?p (1 2 3) }"
         result = format_string(query)
-        # Collection elements are space-separated, closing paren may have space before it
+        # Collection elements are space-separated, closing paren may have space
+        # before it
         assert "1 2 3" in result
 
     def test_nil(self):
@@ -123,7 +124,9 @@ class TestPropertyPathSpacing:
         assert "!<http://a>" in result
 
     def test_property_path_operators_no_space(self):
-        """Regression test: property path operators should not have space before them."""
+        """Regression test: property path operators should not have space before
+        them.
+        """
         query = """PREFIX ex: <http://example.com/>
 SELECT DISTINCT ?s ?o
 WHERE {
@@ -140,18 +143,18 @@ WHERE {
 LIMIT 50"""
         result = format_string(query)
         # No space before path operators
-        assert (
-            "ex:knows*" in result
-        ), f"Expected 'ex:knows*' but got space before *: {result}"
-        assert (
-            "ex:knows+" in result
-        ), f"Expected 'ex:knows+' but got space before +: {result}"
-        assert (
-            "ex:knows?" in result
-        ), f"Expected 'ex:knows?' but got space before ?: {result}"
-        assert (
-            "ex:knows/" in result
-        ), f"Expected 'ex:knows/' but got space before /: {result}"
+        assert "ex:knows*" in result, (
+            f"Expected 'ex:knows*' but got space before *: {result}"
+        )
+        assert "ex:knows+" in result, (
+            f"Expected 'ex:knows+' but got space before +: {result}"
+        )
+        assert "ex:knows?" in result, (
+            f"Expected 'ex:knows?' but got space before ?: {result}"
+        )
+        assert "ex:knows/" in result, (
+            f"Expected 'ex:knows/' but got space before /: {result}"
+        )
         # No space around | in alternatives
         assert (
             "ex:knows|ex:worksWith" in result or "(ex:knows|ex:worksWith)" in result

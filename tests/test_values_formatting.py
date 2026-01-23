@@ -16,9 +16,7 @@ graph ?g {
 
     formatted = sparql.format_string(query)
 
-    assert (
-        "    VALUES ?g {\n" "        <urn:g1>\n" "        <urn:g2>\n" "    }\n"
-    ) in formatted
+    assert ("    VALUES ?g {\n        <urn:g1>\n        <urn:g2>\n    }\n") in formatted
 
 
 def test_values_two_vars_each_row_on_own_line():

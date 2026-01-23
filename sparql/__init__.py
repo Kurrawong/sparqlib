@@ -1,4 +1,6 @@
-from typing import Literal, Optional
+from __future__ import annotations
+
+from typing import Any, Literal
 
 from lark import Token, Tree
 from lark.exceptions import LarkError, UnexpectedInput
@@ -47,9 +49,9 @@ class SparqlSyntaxError(Exception):
     def __init__(
         self,
         message: str,
-        line: Optional[int] = None,
-        column: Optional[int] = None,
-        original_error: Optional[Exception] = None,
+        line: int | None = None,
+        column: int | None = None,
+        original_error: Exception | None = None,
     ):
         super().__init__(message)
         self.message = message
@@ -72,8 +74,8 @@ def _wrap_lark_error(error: Exception, parser_type: str) -> SparqlSyntaxError:
 
 
 def normalize_keyword_tokens(
-    node: Tree | Token, keyword_set: frozenset[str] | None = None
-) -> Tree | Token:
+    node: Tree[Any] | Token, keyword_set: frozenset[str] | None = None
+) -> Tree[Any] | Token:
     """Normalize SPARQL keyword token values to uppercase in a Lark tree."""
     if keyword_set is None:
         keyword_set = SparqlSerializer.KEYWORDS
@@ -90,12 +92,12 @@ def normalize_keyword_tokens(
             node.data,
             [normalize_keyword_tokens(child, keyword_set) for child in node.children],
         )
-    return node
+    return node  # type: ignore[unreachable]
 
 
 def validate(
     query: str,
-    parser_type: Optional[ParserType] = None,
+    parser_type: ParserType | None = None,
     *,
     strict: bool = False,
 ) -> bool:
@@ -141,7 +143,7 @@ def validate(
 
 def format_string(
     query: str,
-    parser_type: Optional[ParserType] = None,
+    parser_type: ParserType | None = None,
     *,
     strict: bool = False,
     preserve_comments: bool = True,
@@ -181,7 +183,8 @@ def format_string_explicit(
 ) -> str:
     """Parse the input string and return a formatted version of it.
 
-    This is faster than the format_string function if you know the query type ahead of time.
+    This is faster than the format_string function if you know the query type
+    ahead of time.
 
     :param query: Input query string.
     :param parser_type: The parser type, either "sparql" or "sparql_update".
@@ -220,7 +223,8 @@ def format_string_explicit(
 def format_query(query: str) -> str:
     """Parse and format a SPARQL query.
 
-    This is a convenience function equivalent to format_string_explicit(query, "sparql").
+    This is a convenience function equivalent to
+    format_string_explicit(query, "sparql").
 
     :param query: Input SPARQL query string.
     :return: Formatted query.
@@ -232,7 +236,8 @@ def format_query(query: str) -> str:
 def format_update(query: str) -> str:
     """Parse and format a SPARQL update.
 
-    This is a convenience function equivalent to format_string_explicit(query, "sparql_update").
+    This is a convenience function equivalent to
+    format_string_explicit(query, "sparql_update").
 
     :param query: Input SPARQL update string.
     :return: Formatted update.
@@ -267,10 +272,10 @@ def validate_update(query: str) -> bool:
 
 def parse(
     query: str,
-    parser_type: Optional[ParserType] = None,
+    parser_type: ParserType | None = None,
     *,
     preserve_comments: bool = True,
-) -> Tree:
+) -> Tree[Any]:
     """Parse a SPARQL query or update and return the AST.
 
     This function provides direct access to the parsed abstract syntax tree,
@@ -319,7 +324,7 @@ def parse(
         )
 
 
-def parse_query(query: str, *, preserve_comments: bool = True) -> Tree:
+def parse_query(query: str, *, preserve_comments: bool = True) -> Tree[Any]:
     """Parse a SPARQL query and return the AST.
 
     This is a convenience function equivalent to parse(query, "sparql").
@@ -331,7 +336,7 @@ def parse_query(query: str, *, preserve_comments: bool = True) -> Tree:
     return parse(query, parser_type="sparql", preserve_comments=preserve_comments)
 
 
-def parse_update(query: str, *, preserve_comments: bool = True) -> Tree:
+def parse_update(query: str, *, preserve_comments: bool = True) -> Tree[Any]:
     """Parse a SPARQL update and return the AST.
 
     This is a convenience function equivalent to parse(query, "sparql_update").
@@ -345,7 +350,7 @@ def parse_update(query: str, *, preserve_comments: bool = True) -> Tree:
     )
 
 
-def serialize(tree: Tree, *, preserve_comments: bool = True) -> str:
+def serialize(tree: Tree[Any], *, preserve_comments: bool = True) -> str:
     """Serialize a SPARQL AST back to a string.
 
     This function enables round-tripping: parse a query, modify the AST,

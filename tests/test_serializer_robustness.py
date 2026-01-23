@@ -14,29 +14,23 @@ class TestRobustness:
         # Robustness: GROUP (token), BY (token), extra_token, var
 
         # Manually build a tree simulating a 'group_clause'
-        # Current parser structure is roughly: [Token(GROUP), Token(BY), group_condition...]
+        # Current parser structure is roughly:
+        # [Token(GROUP), Token(BY), group_condition...]
 
         group_token = Token("GROUP", "GROUP")
         by_token = Token("BY", "BY")
+        garbage = Token("RAW", " /*comment*/ ")
         var_tree = Tree("var", [Token("VAR", "?x")])
 
-        # We insert a "garbage" token in between
-        garbage = Token("RAW", " /*comment*/ ")
+        tree = Tree("group_clause", [group_token, by_token, garbage, var_tree])
 
-        tree = Tree("group_clause", [group_token, garbage, by_token, var_tree])
-
+        serializer = SparqlSerializer()
         # This calls _group_clause_enter
-        # It should find GROUP and BY, print them, and then process children that are NOT group/by.
-        # So it should process 'garbage' and 'var_tree'.
+        # It should find GROUP and BY, print them, and then process children that
+        # are NOT group/by. So it should process 'garbage' and 'var_tree'.
+        result = serializer.visit_topdown(tree)
 
-        # We need a context to capture output.
-        # Since visit_topdown manages stack, we can just call it.
-        # But we need a full wrapper or just call the handler directly?
-        # Calling handler directly requires setting up 'self._parts' etc.
-
-        result = self.serializer.visit_topdown(tree)
-
-        # Expectation: "GROUP BY  /*comment*/  ?x " (roughly)
+        # Expectation: "GROUP BY  GARBAGE  ?x " (roughly)
         # The serializer handles tokens by printing value + space.
         assert "GROUP BY" in result
         assert "/*comment*/" in result
@@ -167,10 +161,11 @@ class TestRobustness:
         result = self.serializer.visit_topdown(tree)
 
         # It should still find 'quads' and serialize it.
-        # 'garbage' might be ignored because _quad_data_enter specifically looks for 'quads' child
-        # and pushes IT to the stack. It does NOT push other children.
-        # This is the intended behavior of the robust change (target specific child).
-
+        # 'garbage' might be ignored because _quad_data_enter specifically looks
+        # for 'quads' child and pushes IT to the stack. It does NOT push other
+        # children. This is the intended behavior of the robust change (target
+        # specific child).
+        assert "{" in result
         assert "?s" in result
         assert "?p" in result
         assert "?o" in result

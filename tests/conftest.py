@@ -13,7 +13,7 @@ TEST_DIR = Path(__file__).parent
 @pytest.fixture
 def test_roundtrip():
     def _test_roundtrip(filename: str):
-        with open(filename, "r", encoding="utf-8") as file:
+        with open(filename, encoding="utf-8") as file:
             query = file.read()
 
             parser = sparql_query_parser

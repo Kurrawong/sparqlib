@@ -1,5 +1,9 @@
 """Tests for serializer extensibility through subclassing."""
 
+from __future__ import annotations
+
+from typing import Any
+
 import pytest
 from lark import Token, Tree
 
@@ -17,9 +21,10 @@ class CustomSerializer(SparqlSerializer):
         handler_map["var"] = {"enter": CustomSerializer._custom_var_enter, "exit": None}
         return handler_map
 
-    def _custom_var_enter(self, tree: Tree, context: dict) -> bool:
+    def _custom_var_enter(self, tree: Tree[Any], context: dict[str, Any]) -> bool:
         """Custom handler that uppercases variables."""
         var_token = tree.children[0]
+        assert isinstance(var_token, Token)
         self._parts.append(var_token.value.upper())
         self._parts.append(" ")
         return True
@@ -36,7 +41,7 @@ class ExtendedSerializer(SparqlSerializer):
         }
         return handler_map
 
-    def _custom_nil_enter(self, tree: Tree, context: dict) -> bool:
+    def _custom_nil_enter(self, tree: Tree[Any], context: dict[str, Any]) -> bool:
         """Custom handler that adds a comment before NIL."""
         self._parts.append("() ")  # Standard NIL output
         return True
@@ -62,11 +67,14 @@ def test_subclass_can_override_handler():
 
 
 def test_base_class_unaffected_by_subclass():
-    """Verify base class maintains its handlers independently after subclass instantiation."""
+    """Verify base class maintains its handlers independently after subclass
+    instantiation.
+    """
     query = "SELECT ?x WHERE { ?s ?p ?o }"
     tree = sparql_query_parser.parse(query)
 
-    # First create a custom serializer (this will populate _handler_cache for CustomSerializer)
+    # First create a custom serializer (this will populate _handler_cache for
+    # CustomSerializer)
     custom_ser = CustomSerializer()
     custom_result = custom_ser.visit_topdown(tree)
 

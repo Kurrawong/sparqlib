@@ -18,6 +18,7 @@ dependencies = [
 
 [dependency-groups]
 dev = [
+    "mypy>=1.8.0",
     "pytest>=7.4.3",
     "ruff>=0.1.11",
 ]
@@ -26,10 +27,37 @@ dev = [
 packages = ["sparql"]
 
 [tool.ruff]
+target-version = "py311"
+line-length = 88
+extend-exclude = [".venv"]
+
+[tool.ruff.lint]
 select = [
-    "I001",
-    "I002"
+    "B",   # flake8-bugbear
+    "C4",  # flake8-comprehensions
+    "E",   # pycodestyle errors
+    "F",   # pyflakes
+    "I",   # isort
+    "PIE", # flake8-pie
+    "SIM", # flake8-simplify
+    "UP",  # pyupgrade
 ]
+
+[tool.mypy]
+python_version = "3.11"
+strict = true
+warn_unreachable = true
+pretty = true
+show_column_numbers = true
+show_error_codes = true
+exclude = ["tests/data"]
+
+[[tool.mypy.overrides]]
+module = "tests.*"
+disallow_untyped_defs = false
+disallow_incomplete_defs = false
+disallow_untyped_calls = false
+check_untyped_defs = false
 
 [tool.pytest.ini_options]
 markers = [

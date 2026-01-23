@@ -727,6 +727,7 @@ class SparqlSerializer(IterativeTreeVisitor):
         """
         cls = self.__class__
         return {
+            "unit": {"enter": None, "exit": None},
             "query_unit": {"enter": None, "exit": None},
             "update_unit": {"enter": None, "exit": None},
             "update": {"enter": cls._update_enter, "exit": None},

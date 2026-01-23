@@ -20,14 +20,16 @@ class TestParse:
         query = "SELECT * WHERE { ?s ?p ?o }"
         tree = parse(query)
         assert isinstance(tree, Tree)
-        assert tree.data == "query_unit"
+        assert tree.data == "unit"
+        assert tree.children[0].data == "query_unit"
 
     def test_parse_update(self):
         """Test parsing an UPDATE returns a Tree."""
         query = "INSERT DATA { <s> <p> <o> }"
         tree = parse(query)
         assert isinstance(tree, Tree)
-        assert tree.data == "update_unit"
+        assert tree.data == "unit"
+        assert tree.children[0].data == "update_unit"
 
     def test_parse_with_explicit_type(self):
         """Test parsing with explicit parser type."""
@@ -40,11 +42,11 @@ class TestParse:
         with pytest.raises(SparqlSyntaxError):
             parse("NOT A VALID QUERY")
 
-    def test_parse_wrong_type_falls_back(self):
-        """Test that wrong parser type falls back to correct one."""
+    def test_parse_unified_unit_root(self):
+        """Test unified parser returns a unit root."""
         update = "INSERT DATA { <s> <p> <o> }"
         tree = parse(update)
-        assert tree.data == "update_unit"
+        assert tree.data == "unit"
 
     def test_parse_query_convenience(self):
         """Test parse_query convenience function."""

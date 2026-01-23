@@ -1,11 +1,10 @@
-import re
 from typing import Literal, Optional
 
 from lark import Token, Tree
 from lark.exceptions import LarkError, UnexpectedInput
 
 from sparql.comments import attach_comments, scan_raw_comments
-from sparql.parser import sparql_parser, sparql_update_parser
+from sparql.parser import sparql_parser, sparql_unit_parser, sparql_update_parser
 from sparql.serializer import SparqlSerializer
 
 ParserType = Literal["sparql", "sparql_update"]
@@ -93,77 +92,6 @@ def normalize_keyword_tokens(
     return node
 
 
-# Keywords that indicate the query type (case-insensitive)
-_QUERY_KEYWORDS: frozenset[str] = frozenset(
-    {"select", "construct", "ask", "describe"}
-)
-_UPDATE_KEYWORDS: frozenset[str] = frozenset(
-    {"insert", "delete", "load", "clear", "drop", "add", "move", "copy", "create", "with"}
-)
-_PROLOGUE_KEYWORDS: frozenset[str] = frozenset({"prefix", "base"})
-
-# Pattern to tokenize the beginning of a SPARQL query for fast keyword detection
-# Matches: comments, IRIs, prefixed names, prefix labels, keywords/identifiers,
-# or skippable chars
-_TOKEN_PATTERN = re.compile(
-    r"""
-    \#[^\n]*                           |  # Comments (skip to end of line)
-    <[^>]*>                            |  # IRIs
-    [A-Za-z_][A-Za-z0-9_]*:            |  # Prefix labels (e.g., PREFIX ex:)
-    [A-Za-z_][A-Za-z0-9_]*:[A-Za-z0-9_]*  |  # Prefixed names (skip)
-    [A-Za-z_][A-Za-z0-9_]*             |  # Keywords/identifiers
-    \s+                                |  # Whitespace
-    .                                     # Any other character
-    """,
-    re.VERBOSE | re.IGNORECASE,
-)
-
-
-def _guess_parser_type(query: str) -> ParserType:
-    """Guess the parser type based on the first significant keyword.
-
-    This is an optimized heuristic that scans for the first query/update
-    keyword after any PREFIX/BASE declarations, without processing the
-    entire query string.
-
-    Args:
-        query: The SPARQL query string.
-
-    Returns:
-        'sparql' for SELECT/CONSTRUCT/ASK/DESCRIBE queries,
-        'sparql_update' for INSERT/DELETE/LOAD/etc update operations.
-    """
-    for match in _TOKEN_PATTERN.finditer(query):
-        token = match.group()
-
-        # Skip whitespace and comments
-        if not token.strip() or token.startswith("#"):
-            continue
-
-        # Skip IRIs and prefixed names
-        if token.startswith("<") or ":" in token:
-            continue
-
-        token_lower = token.lower()
-
-        # Skip prologue keywords (PREFIX, BASE)
-        if token_lower in _PROLOGUE_KEYWORDS:
-            continue
-
-        # Check if it's a query or update keyword
-        if token_lower in _QUERY_KEYWORDS:
-            return "sparql"
-        if token_lower in _UPDATE_KEYWORDS:
-            return "sparql_update"
-
-        # Unknown keyword - could be part of a prefixed name or something else
-        # Continue scanning
-        continue
-
-    # Default to query parser if no keywords found
-    return "sparql"
-
-
 def validate(
     query: str,
     parser_type: Optional[ParserType] = None,
@@ -174,33 +102,23 @@ def validate(
 
     This is faster than format_string when you only need to check validity.
 
-    When parser_type is None, a heuristic is used to guess the most likely
-    parser type. If parsing fails, the other parser is tried as a fallback
-    (unless strict=True). If both parsers fail, the error from the initially
-    guessed parser is raised.
+    When parser_type is None, a unified grammar is used to parse both queries
+    and updates without heuristic guessing.
 
     :param query: Input query string.
     :param parser_type: Optional parser type. If provided, only that parser is used.
-    :param strict: If True, do not fall back to the secondary parser when the
-        guessed parser fails.
+    :param strict: Reserved for backwards compatibility; has no effect when
+        parser_type is None.
     :return: True if the query is valid.
     :raises SparqlSyntaxError: If the query has a syntax error.
     :raises ValueError: If parser_type is not None, "sparql", or "sparql_update".
     """
     if parser_type is None:
-        guessed_type = _guess_parser_type(query)
         try:
-            return validate(query, guessed_type)
-        except SparqlSyntaxError as e:
-            if strict:
-                raise
-            other_type: ParserType = (
-                "sparql_update" if guessed_type == "sparql" else "sparql"
-            )
-            try:
-                return validate(query, other_type)
-            except SparqlSyntaxError:
-                raise e
+            sparql_unit_parser.parse(query)
+            return True
+        except (LarkError, UnexpectedInput) as e:
+            raise _wrap_lark_error(e, "SPARQL query/update") from e
 
     if parser_type == "sparql":
         try:
@@ -229,56 +147,30 @@ def format_string(
 ) -> str:
     """Parse the input string and return a formatted version of it.
 
-    It first attempts to parse the query based on a heuristic guess,
-    falling back to the other parser if the first fails (unless strict=True).
+    It parses using the unified grammar, which accepts both queries and updates.
 
     :param query: Input query string.
-    :param parser_type: Optional parser type. If provided, the heuristic is skipped
-        and only that parser is used.
-    :param strict: If True, do not fall back to the secondary parser when the
-        guessed parser fails. This avoids the double-parsing cost for ambiguous
-        queries but will fail if the heuristic guesses wrong.
+    :param parser_type: Optional parser type. If provided, only that parser is used.
+    :param strict: Reserved for backwards compatibility; has no effect when
+        parser_type is None.
     :return: Formatted query.
     :raises SparqlSyntaxError: If the query has a syntax error.
     """
     if parser_type is not None:
         return format_string_explicit(query, parser_type=parser_type)
 
-    guessed_type = _guess_parser_type(query)
-    primary_parser = sparql_parser if guessed_type == "sparql" else sparql_update_parser
-    context = "query" if guessed_type == "sparql" else "update"
-
     try:
         if preserve_comments:
-            tree = primary_parser.parse(query)
+            tree = sparql_unit_parser.parse(query)
             attach_comments(tree, scan_raw_comments(query))
         else:
-            tree = primary_parser.parse(query)
-        serializer = SparqlSerializer(preserve_comments=preserve_comments)
-        serializer.visit_topdown(tree)
-        return serializer.result
+            tree = sparql_unit_parser.parse(query)
     except (LarkError, UnexpectedInput) as e:
-        if strict:
-            raise _wrap_lark_error(e, f"SPARQL {context}") from e
-        first_error = e
+        raise _wrap_lark_error(e, "SPARQL query/update") from e
 
-    # Fallback to secondary parser
-    secondary_parser = (
-        sparql_update_parser if guessed_type == "sparql" else sparql_parser
-    )
-
-    try:
-        if preserve_comments:
-            tree = secondary_parser.parse(query)
-            attach_comments(tree, scan_raw_comments(query))
-        else:
-            tree = secondary_parser.parse(query)
-        serializer = SparqlSerializer(preserve_comments=preserve_comments)
-        serializer.visit_topdown(tree)
-        return serializer.result
-    except (LarkError, UnexpectedInput):
-        # Raise error for the primary guess type, as it was the most likely intent
-        raise _wrap_lark_error(first_error, f"SPARQL {context}") from first_error
+    serializer = SparqlSerializer(preserve_comments=preserve_comments)
+    serializer.visit_topdown(tree)
+    return serializer.result
 
 
 def format_string_explicit(
@@ -379,8 +271,8 @@ def parse(
     This function provides direct access to the parsed abstract syntax tree,
     enabling advanced use cases like query analysis and modification.
 
-    When parser_type is None, a heuristic is used to guess the most likely
-    parser type. If parsing fails, the other parser is tried as a fallback.
+    When parser_type is None, a unified grammar is used to parse both queries
+    and updates without heuristic guessing.
 
     :param query: Input SPARQL query or update string.
     :param parser_type: Optional parser type. If None, tries both parsers.
@@ -389,17 +281,14 @@ def parse(
     :raises ValueError: If parser_type is not None, "sparql", or "sparql_update".
     """
     if parser_type is None:
-        guessed_type = _guess_parser_type(query)
         try:
-            return parse(query, guessed_type, preserve_comments=preserve_comments)
-        except SparqlSyntaxError as e:
-            other_type: ParserType = (
-                "sparql_update" if guessed_type == "sparql" else "sparql"
-            )
-            try:
-                return parse(query, other_type, preserve_comments=preserve_comments)
-            except SparqlSyntaxError:
-                raise e
+            if preserve_comments:
+                tree = sparql_unit_parser.parse(query)
+                attach_comments(tree, scan_raw_comments(query))
+                return tree
+            return sparql_unit_parser.parse(query)
+        except (LarkError, UnexpectedInput) as e:
+            raise _wrap_lark_error(e, "SPARQL query/update") from e
 
     if parser_type == "sparql":
         try:

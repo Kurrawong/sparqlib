@@ -1,3 +1,5 @@
+unit: query_unit | update_unit
+
 query_unit: query
 
 query: prologue ( select_query | construct_query | describe_query | ask_query ) values_clause

@@ -1,9 +1,22 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from importlib.resources import files
 from typing import Any, Iterable
 
-from lark import Token, Tree
+from lark import Lark, Token, Tree
+
+_GRAMMAR = files(__package__).joinpath("grammar.lark").read_text(encoding="utf-8")
+_COMMENT_LEXER_GRAMMAR = (
+    _GRAMMAR.replace("%ignore /[ \\t\\n]/+ | COMMENT", "%ignore /[ \\t\\n]/+")
+    + "\ncomment_unit: (COMMENT | unit)*\n"
+)
+_COMMENT_LEXER = Lark(
+    _COMMENT_LEXER_GRAMMAR,
+    start="comment_unit",
+    propagate_positions=True,
+    lexer="basic",
+)
 
 
 @dataclass(frozen=True)
@@ -72,194 +85,52 @@ def _significant_tokens_in_source_order(tree: Tree) -> list[Token]:
 
 
 def scan_raw_comments(source: str) -> list[RawComment]:
-    """Collect raw '# ...' comments with stream positions (single pass).
-
-    This scanner intentionally ignores '#' that occur within:
-    - IRIREFs (`<...>`)
-    - quoted string literals (single/double and long forms)
-    - escaped sequences like '\\#'
-    """
+    """Collect raw '# ...' comments with stream positions via Lark lexing."""
     raw: list[RawComment] = []
-    n = len(source)
-    i = 0
-    line = 1
-    col = 1
+    tokens = list(_COMMENT_LEXER.lex(source))
 
-    def advance(ch: str) -> None:
-        nonlocal line, col
-        if ch == "\n":
-            line += 1
-            col = 1
-        else:
-            col += 1
-
-    in_iriref = False
-    str_mode: str | None = None  # "s", "d", "ls", "ld"
     open_brace_index = 0
-    last_open_brace_index = 0
     close_paren_index = 0
-    last_close_paren_index = 0
-    last_line_start_pos = 0
 
-    while i < n:
-        ch = source[i]
-
-        # Handle "escaped comment marker" conservatively
-        if ch == "\\" and i + 1 < n:
-            # Skip the escaped char as a unit.
-            advance(ch)
-            i += 1
-            advance(source[i])
-            i += 1
-            continue
-
-        if in_iriref:
-            advance(ch)
-            i += 1
-            if ch == ">":
-                in_iriref = False
-            continue
-
-        if str_mode is not None:
-            # Long strings end on triple quotes.
-            if str_mode == "ls" and source.startswith("'''", i):
-                for _ in range(3):
-                    advance("'")
-                i += 3
-                str_mode = None
-                continue
-            if str_mode == "ld" and source.startswith('"""', i):
-                for _ in range(3):
-                    advance('"')
-                i += 3
-                str_mode = None
-                continue
-
-            # Short strings end on a matching quote.
-            if str_mode == "s" and ch == "'":
-                advance(ch)
-                i += 1
-                str_mode = None
-                continue
-            if str_mode == "d" and ch == '"':
-                advance(ch)
-                i += 1
-                str_mode = None
-                continue
-
-            advance(ch)
-            i += 1
-            continue
-
-        # Not inside IRI or string
-        if ch == "<":
-            in_iriref = True
-            advance(ch)
-            i += 1
-            continue
-
-        if source.startswith("'''", i):
-            str_mode = "ls"
-            for _ in range(3):
-                advance("'")
-            i += 3
-            continue
-        if source.startswith('"""', i):
-            str_mode = "ld"
-            for _ in range(3):
-                advance('"')
-            i += 3
-            continue
-        if ch == "'":
-            str_mode = "s"
-            advance(ch)
-            i += 1
-            continue
-        if ch == '"':
-            str_mode = "d"
-            advance(ch)
-            i += 1
-            continue
-
-        if ch == "\n":
-            last_line_start_pos = i + 1
-            advance(ch)
-            i += 1
-            continue
-
-        if ch == "{":
+    for token in tokens:
+        if token.type == "LEFT_CURLY_BRACE":
             open_brace_index += 1
-            last_open_brace_index = open_brace_index
-            advance(ch)
-            i += 1
-            continue
-
-        if ch == ")":
+        elif token.type == "RIGHT_PARENTHESIS":
             close_paren_index += 1
-            last_close_paren_index = close_paren_index
-            advance(ch)
-            i += 1
+
+        if token.type != "COMMENT":
             continue
 
-        if ch == "}":
-            advance(ch)
-            i += 1
-            continue
+        start_pos = _pos_start(token)
+        end_pos = _end_pos_fallback(token)
+        line = getattr(token, "line", None)
+        column = getattr(token, "column", None)
+        value = token.value
 
-        if ch == "#":
-            start_pos = i
-            start_line = line
-            start_col = col
+        if start_pos is None:
+            line_start_pos = 0
+        else:
+            line_start_pos = source.rfind("\n", 0, start_pos) + 1
+        prefix = source[line_start_pos:start_pos] if start_pos is not None else ""
+        inline = prefix.strip(" \t") != ""
 
-            # Consume until newline or EOF.
-            j = i
-            while j < n and source[j] != "\n":
-                j += 1
-            value = source[i:j]
+        last_non_ws = prefix.rstrip(" \t")[-1:] if inline else ""
 
-            # Determine inline-ness based on whether there is non-whitespace before '#'
-            # on the same line (ignoring tabs/spaces).
-            prefix = source[last_line_start_pos:start_pos]
-            inline = prefix.strip(" \t") != ""
+        after_open_brace_index = open_brace_index if last_non_ws == "{" else None
+        after_close_paren_index = close_paren_index if last_non_ws == ")" else None
 
-            # Special-case: comment immediately after '{' (ignoring whitespace),
-            # e.g. "WHERE { # comment"
-            after_open_brace_index: int | None = None
-            if inline:
-                k = start_pos - 1
-                while k >= last_line_start_pos and source[k] in (" ", "\t"):
-                    k -= 1
-                if k >= last_line_start_pos and source[k] == "{":
-                    after_open_brace_index = last_open_brace_index or None
-            after_close_paren_index: int | None = None
-            if inline:
-                k = start_pos - 1
-                while k >= last_line_start_pos and source[k] in (" ", "\t"):
-                    k -= 1
-                if k >= last_line_start_pos and source[k] == ")":
-                    after_close_paren_index = last_close_paren_index or None
-
-            raw.append(
-                RawComment(
-                    value=value,
-                    start_pos=start_pos,
-                    end_pos=j,
-                    line=start_line,
-                    column=start_col,
-                    inline=inline,
-                    after_open_brace_index=after_open_brace_index,
-                    after_close_paren_index=after_close_paren_index,
-                )
+        raw.append(
+            RawComment(
+                value=value,
+                start_pos=start_pos,
+                end_pos=end_pos,
+                line=line,
+                column=column,
+                inline=inline,
+                after_open_brace_index=after_open_brace_index,
+                after_close_paren_index=after_close_paren_index,
             )
-
-            # Advance over the comment text (but not the newline).
-            while i < j:
-                advance(source[i])
-                i += 1
-            continue
-
-        advance(ch)
-        i += 1
+        )
 
     return raw
 
@@ -344,4 +215,3 @@ def attach_comments(tree: Tree, raw_comments: list[RawComment]) -> None:
     tree.meta.sparql_inline_comments_after_token = inline_after_token  # type: ignore[attr-defined]
     tree.meta.sparql_inline_comments_after_open_brace = inline_after_open_brace  # type: ignore[attr-defined]
     tree.meta.sparql_inline_comments_after_close_paren = inline_after_close_paren  # type: ignore[attr-defined]
-

@@ -182,7 +182,9 @@ class IterativeTreeVisitor:
     _handler_cache: dict[type, dict[str, TreeHandler]] = {}
 
     # Tokens that should not have a space before them
-    _NO_SPACE_BEFORE: frozenset[str] = frozenset((")", "]", "}", ",", ";", "(", "["))
+    _NO_SPACE_BEFORE: frozenset[str] = frozenset(
+        (")", "]", "}", ",", ";", "(", "[", "*", "+", "?", "/", "|")
+    )
     # Tokens that should not have a space after them
     _NO_SPACE_AFTER: frozenset[str] = frozenset(("(", "["))
 
@@ -1699,6 +1701,7 @@ class SparqlSerializer(IterativeTreeVisitor):
         return False  # path_elt
 
     def _path_mod_enter(self, tree: Tree, context: dict[str, Any]) -> bool:
+        self._trim_trailing_space()
         self._parts.append(tree.children[0].value)
         return True
 

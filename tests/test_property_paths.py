@@ -9,7 +9,7 @@ def test_property_path_alternative():
     tree = sparql_query_parser.parse(query)
     serializer = SparqlSerializer()
     result = serializer.visit_topdown(tree)
-    assert "foaf:knows |foaf:friend" in result
+    assert "foaf:knows|foaf:friend" in result
 
 
 def test_property_path_sequence():
@@ -17,7 +17,7 @@ def test_property_path_sequence():
     tree = sparql_query_parser.parse(query)
     serializer = SparqlSerializer()
     result = serializer.visit_topdown(tree)
-    assert "foaf:knows /foaf:name" in result
+    assert "foaf:knows/foaf:name" in result
 
 
 def test_property_path_inverse():

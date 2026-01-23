@@ -122,6 +122,32 @@ class TestPropertyPathSpacing:
         result = format_string(query)
         assert "!<http://a>" in result
 
+    def test_property_path_operators_no_space(self):
+        """Regression test: property path operators should not have space before them."""
+        query = """PREFIX ex: <http://example.com/>
+SELECT DISTINCT ?s ?o
+WHERE {
+  ?s ex:knows ?o .
+  ?s ex:knows/ex:worksWith ?o .
+  ?s (ex:knows | ex:worksWith) ?o .
+  ?s ^ex:knows ?o .
+  ?s ex:knows* ?o .
+  ?s ex:knows+ ?o .
+  ?s ex:knows? ?o .
+  ?s !(ex:knows | ex:worksWith) ?o .
+  ?s (ex:knows/(ex:worksWith | ex:colleagueOf)) ?o .
+}
+LIMIT 50"""
+        result = format_string(query)
+        # No space before path operators
+        assert "ex:knows*" in result, f"Expected 'ex:knows*' but got space before *: {result}"
+        assert "ex:knows+" in result, f"Expected 'ex:knows+' but got space before +: {result}"
+        assert "ex:knows?" in result, f"Expected 'ex:knows?' but got space before ?: {result}"
+        assert "ex:knows/" in result, f"Expected 'ex:knows/' but got space before /: {result}"
+        # No space around | in alternatives
+        assert "ex:knows|ex:worksWith" in result or "(ex:knows|ex:worksWith)" in result, \
+            f"Expected no space around | in alternative path: {result}"
+
 
 class TestLiteralSpacing:
     """Tests for spacing around literals."""

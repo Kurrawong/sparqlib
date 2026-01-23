@@ -174,7 +174,9 @@ def format_string(
 
     serializer = SparqlSerializer(preserve_comments=preserve_comments)
     serializer.visit_topdown(tree)
-    return serializer.result
+    # Normalize leading/trailing whitespace/newlines so callers get stable output
+    # regardless of input surrounding whitespace.
+    return serializer.result.strip()
 
 
 def format_string_explicit(
@@ -213,7 +215,9 @@ def format_string_explicit(
     serializer = SparqlSerializer(preserve_comments=preserve_comments)
     serializer.visit_topdown(tree)
 
-    return serializer.result
+    # Normalize leading/trailing whitespace/newlines so callers get stable output
+    # regardless of input surrounding whitespace.
+    return serializer.result.strip()
 
 
 def format_query(query: str) -> str:

@@ -34,7 +34,6 @@ SELECT ?search_result_uri ?predicate ?match ?weight (URI(CONCAT("urn:hash:", SHA
 
 
 EXPECTED_FORMATTED = """\
-
 SELECT ?search_result_uri ?predicate ?match ?weight (URI(CONCAT ("urn:hash:", SHA256(CONCAT (STR(?search_result_uri), STR(?predicate), STR(?match), STR(?weight))))) AS ?hashID)
 WHERE {
     SELECT ?search_result_uri ?predicate ?match (SUM(?w) AS ?weight)
@@ -66,4 +65,3 @@ ORDER BY DESC (?weight)"""
 
 def test_example_query_formatting_regression():
     assert format_string(EXAMPLE_QUERY) == EXPECTED_FORMATTED
-

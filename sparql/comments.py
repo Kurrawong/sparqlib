@@ -39,6 +39,7 @@ def _pos_start(token: Token) -> int | None:
 def _pos_end(token: Token) -> int | None:
     return getattr(token, "end_pos", None)
 
+
 def _end_pos_fallback(token: Token) -> int | None:
     """Best-effort token end position when end_pos isn't available."""
     end = _pos_end(token)
@@ -154,10 +155,14 @@ def attach_comments(tree: Tree, raw_comments: list[RawComment]) -> None:
 
     for c in raw_comments:
         if c.after_open_brace_index is not None:
-            inline_after_open_brace.setdefault(c.after_open_brace_index, []).append(c.value)
+            inline_after_open_brace.setdefault(c.after_open_brace_index, []).append(
+                c.value
+            )
             continue
         if c.after_close_paren_index is not None:
-            inline_after_close_paren.setdefault(c.after_close_paren_index, []).append(c.value)
+            inline_after_close_paren.setdefault(c.after_close_paren_index, []).append(
+                c.value
+            )
             continue
 
         if c.inline:
@@ -167,11 +172,7 @@ def attach_comments(tree: Tree, raw_comments: list[RawComment]) -> None:
                 best: int | None = None
                 for i in range(len(tokens) - 1, -1, -1):
                     end = token_ends[i]
-                    if (
-                        token_lines[i] == c.line
-                        and end is not None
-                        and end <= c_start
-                    ):
+                    if token_lines[i] == c.line and end is not None and end <= c_start:
                         best = i
                         break
                 if best is not None:

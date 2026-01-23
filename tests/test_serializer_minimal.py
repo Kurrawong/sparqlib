@@ -19,7 +19,9 @@ def test_minimal_serialization():
 
 
 def test_serializer_spacing_punctuation():
-    query = "SELECT (STR(?s) AS ?x) WHERE { GRAPH <http://example.org/g1> { ?s ?p ?o } }"
+    query = (
+        "SELECT (STR(?s) AS ?x) WHERE { GRAPH <http://example.org/g1> { ?s ?p ?o } }"
+    )
     tree = sparql_query_parser.parse(query)
 
     serializer = SparqlSerializer()
@@ -45,8 +47,8 @@ def test_serializer_spacing_functions():
     result = serializer.visit_topdown(tree)
 
     assert "SUBSTR(?s, 1, 2)" in result
-    assert "REPLACE(?s, \"a\", \"b\")" in result
-    assert "REGEX(?s, \"a\")" in result
+    assert 'REPLACE(?s, "a", "b")' in result
+    assert 'REGEX(?s, "a")' in result
 
 
 if __name__ == "__main__":

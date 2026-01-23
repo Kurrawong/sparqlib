@@ -88,10 +88,7 @@ def normalize_keyword_tokens(
     if isinstance(node, Tree):
         return Tree(
             node.data,
-            [
-                normalize_keyword_tokens(child, keyword_set)
-                for child in node.children
-            ],
+            [normalize_keyword_tokens(child, keyword_set) for child in node.children],
         )
     return node
 
@@ -343,7 +340,9 @@ def parse_update(query: str, *, preserve_comments: bool = True) -> Tree:
     :return: The parsed AST as a lark.Tree.
     :raises SparqlSyntaxError: If the update has a syntax error.
     """
-    return parse(query, parser_type="sparql_update", preserve_comments=preserve_comments)
+    return parse(
+        query, parser_type="sparql_update", preserve_comments=preserve_comments
+    )
 
 
 def serialize(tree: Tree, *, preserve_comments: bool = True) -> str:

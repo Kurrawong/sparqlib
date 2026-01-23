@@ -116,7 +116,9 @@ def test_format_string_explicit_raises_sparql_syntax_error():
 def test_format_string_explicit_raises_value_error_for_invalid_parser_type():
     """Ensure format_string_explicit raises ValueError for invalid parser_type."""
     with pytest.raises(ValueError) as exc_info:
-        sparql.format_string_explicit("SELECT * WHERE { ?s ?p ?o }", parser_type="invalid")
+        sparql.format_string_explicit(
+            "SELECT * WHERE { ?s ?p ?o }", parser_type="invalid"
+        )
     assert "Unexpected parser type" in str(exc_info.value)
 
 

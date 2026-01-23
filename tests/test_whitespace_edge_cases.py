@@ -140,13 +140,22 @@ WHERE {
 LIMIT 50"""
         result = format_string(query)
         # No space before path operators
-        assert "ex:knows*" in result, f"Expected 'ex:knows*' but got space before *: {result}"
-        assert "ex:knows+" in result, f"Expected 'ex:knows+' but got space before +: {result}"
-        assert "ex:knows?" in result, f"Expected 'ex:knows?' but got space before ?: {result}"
-        assert "ex:knows/" in result, f"Expected 'ex:knows/' but got space before /: {result}"
+        assert (
+            "ex:knows*" in result
+        ), f"Expected 'ex:knows*' but got space before *: {result}"
+        assert (
+            "ex:knows+" in result
+        ), f"Expected 'ex:knows+' but got space before +: {result}"
+        assert (
+            "ex:knows?" in result
+        ), f"Expected 'ex:knows?' but got space before ?: {result}"
+        assert (
+            "ex:knows/" in result
+        ), f"Expected 'ex:knows/' but got space before /: {result}"
         # No space around | in alternatives
-        assert "ex:knows|ex:worksWith" in result or "(ex:knows|ex:worksWith)" in result, \
-            f"Expected no space around | in alternative path: {result}"
+        assert (
+            "ex:knows|ex:worksWith" in result or "(ex:knows|ex:worksWith)" in result
+        ), f"Expected no space around | in alternative path: {result}"
 
 
 class TestLiteralSpacing:

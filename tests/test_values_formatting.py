@@ -17,15 +17,14 @@ graph ?g {
     formatted = sparql.format_string(query)
 
     assert (
-        "    VALUES ?g {\n"
-        "        <urn:g1>\n"
-        "        <urn:g2>\n"
-        "    }\n"
+        "    VALUES ?g {\n" "        <urn:g1>\n" "        <urn:g2>\n" "    }\n"
     ) in formatted
 
 
 def test_values_two_vars_each_row_on_own_line():
-    query = "SELECT * WHERE { VALUES (?g ?g2) { (<urn:g1> <urn:g2>) (<urn:g3> <urn:g4>) } }"
+    query = (
+        "SELECT * WHERE { VALUES (?g ?g2) { (<urn:g1> <urn:g2>) (<urn:g3> <urn:g4>) } }"
+    )
     formatted = sparql.format_string(query)
 
     assert (
@@ -34,4 +33,3 @@ def test_values_two_vars_each_row_on_own_line():
         "        (<urn:g3> <urn:g4>)\n"
         "    }\n"
     ) in formatted
-

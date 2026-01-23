@@ -1,10 +1,12 @@
 from sparql import parse_query
 from sparql.serializer import SparqlSerializer
 
+
 def serialize(query):
     tree = parse_query(query)
     serializer = SparqlSerializer()
     return serializer.visit_topdown(tree)
+
 
 def test_construct_where_spacing():
     query = "CONSTRUCT WHERE { ?s ?p ?o }"
@@ -16,6 +18,7 @@ def test_construct_where_spacing():
     assert "WHERE {" in serialized
     assert "WHERE  {" not in serialized
 
+
 def test_union_spacing():
     query = "SELECT * WHERE { { ?s ?p ?o } UNION { ?s ?p ?o } }"
     serialized = serialize(query)
@@ -25,6 +28,7 @@ def test_union_spacing():
     assert "UNION {" in serialized
     assert "UNION  {" not in serialized
 
+
 def test_service_spacing():
     query = "SELECT * WHERE { SERVICE <http://example.org> { ?s ?p ?o } }"
     serialized = serialize(query)
@@ -32,6 +36,7 @@ def test_service_spacing():
     # Note: SERVICE adds indentation too.
     assert "SERVICE <http://example.org> {" in serialized
     assert "SERVICE  <http://example.org> {" not in serialized
+
 
 def test_bind_as_spacing():
     query = "SELECT * WHERE { BIND(1 AS ?x) }"

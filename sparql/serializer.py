@@ -284,7 +284,11 @@ class IterativeTreeVisitor:
             if self._no_space_after:
                 return
             last_char = self._last_char()
-            if last_char is None or last_char.isspace() or last_char in self._NO_SPACE_AFTER:
+            if (
+                last_char is None
+                or last_char.isspace()
+                or last_char in self._NO_SPACE_AFTER
+            ):
                 return
             self._parts.append(" ")
         elif token.type == "RAW":
@@ -487,7 +491,9 @@ class SparqlSerializer(IterativeTreeVisitor):
                 self._comment_token_id_to_index = {
                     int(token_id): i for i, token_id in enumerate(token_ids)
                 }
-            inline_after_token = getattr(tree.meta, "sparql_inline_comments_after_token", None)
+            inline_after_token = getattr(
+                tree.meta, "sparql_inline_comments_after_token", None
+            )
             if isinstance(inline_after_token, dict):
                 self._inline_after_token = inline_after_token
             inline_after_open_brace = getattr(
@@ -669,7 +675,11 @@ class SparqlSerializer(IterativeTreeVisitor):
             if self._no_space_after:
                 return
             last_char = self._last_char()
-            if last_char is None or last_char.isspace() or last_char in self._NO_SPACE_AFTER:
+            if (
+                last_char is None
+                or last_char.isspace()
+                or last_char in self._NO_SPACE_AFTER
+            ):
                 return
             self._parts.append(" ")
         elif token.type == "RAW":
@@ -1574,7 +1584,9 @@ class SparqlSerializer(IterativeTreeVisitor):
         self._parts.append(f"{self._indent_prefix()}{bind_value} (")
         self._stack.append((Token("RPAR", ") "), TraversalPhase.ENTER, context))
         self._stack.append((var, TraversalPhase.ENTER, context))
-        self._stack.append((Token("RAW", f" {as_value} "), TraversalPhase.ENTER, context))
+        self._stack.append(
+            (Token("RAW", f" {as_value} "), TraversalPhase.ENTER, context)
+        )
         self._stack.append((expression, TraversalPhase.ENTER, context))
         return True
 
@@ -1658,7 +1670,11 @@ class SparqlSerializer(IterativeTreeVisitor):
         # Avoid introducing double spaces in `?s ?p ?o` patterns: the token handler
         # already emits trailing spaces for most tokens.
         last_char = self._last_char()
-        if last_char is None or last_char.isspace() or last_char in self._NO_SPACE_AFTER:
+        if (
+            last_char is None
+            or last_char.isspace()
+            or last_char in self._NO_SPACE_AFTER
+        ):
             return False
         self._parts.append(" ")
         return False
@@ -1994,9 +2010,7 @@ class SparqlSerializer(IterativeTreeVisitor):
         exists_token = tree.children[1]
         not_value = self._format_keyword_value(not_token.value)
         exists_value = self._format_keyword_value(exists_token.value)
-        self._parts.append(
-            f"{self._indent_prefix()}{not_value} {exists_value}"
-        )
+        self._parts.append(f"{self._indent_prefix()}{not_value} {exists_value}")
         self._stack.append((tree.children[2], TraversalPhase.ENTER, context))
         return True
 
@@ -2188,7 +2202,11 @@ class SparqlSerializer(IterativeTreeVisitor):
         # already ended the line with '\n'. If empty, force a newline after '{'.
         if values:
             self._stack.append(
-                (Token("RAW", f"{self._indent_prefix()}}}"), TraversalPhase.ENTER, context)
+                (
+                    Token("RAW", f"{self._indent_prefix()}}}"),
+                    TraversalPhase.ENTER,
+                    context,
+                )
             )
         else:
             self._stack.append(
@@ -2246,13 +2264,19 @@ class SparqlSerializer(IterativeTreeVisitor):
                     )
                 elif child.value == "(":
                     # Ensure exactly one space before the opening paren.
-                    self._stack.append((Token("RAW", " ("), TraversalPhase.ENTER, context))
+                    self._stack.append(
+                        (Token("RAW", " ("), TraversalPhase.ENTER, context)
+                    )
                 elif child.value == ")":
                     # Trim trailing space inside the list, then add ') '.
-                    self._stack.append((Token("RAW", ") "), TraversalPhase.ENTER, context))
+                    self._stack.append(
+                        (Token("RAW", ") "), TraversalPhase.ENTER, context)
+                    )
                 elif child.value == "()":
                     # NIL header (rare): keep one leading space.
-                    self._stack.append((Token("RAW", " () "), TraversalPhase.ENTER, context))
+                    self._stack.append(
+                        (Token("RAW", " () "), TraversalPhase.ENTER, context)
+                    )
                 else:
                     self._stack.append((child, TraversalPhase.ENTER, context))
             else:
@@ -2275,7 +2299,11 @@ class SparqlSerializer(IterativeTreeVisitor):
         )
         if nil_token is not None:
             self._stack.append(
-                (Token("RAW", f"{self._indent_prefix(1)}()\n"), TraversalPhase.ENTER, context)
+                (
+                    Token("RAW", f"{self._indent_prefix(1)}()\n"),
+                    TraversalPhase.ENTER,
+                    context,
+                )
             )
             return True
 

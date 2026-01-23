@@ -1,6 +1,5 @@
 from sparql import format_string
 
-
 EXAMPLE_QUERY = """\
 SELECT ?search_result_uri ?predicate ?match ?weight (URI(CONCAT("urn:hash:", SHA256(CONCAT(STR(?search_result_uri), STR(?predicate), STR(?match), STR(?weight))))) AS ?hashID)
     WHERE {

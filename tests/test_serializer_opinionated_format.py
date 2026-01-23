@@ -16,13 +16,13 @@ def test_serializer_opinionated_formatting():
         "WHERE {\n"
         "    GRAPH ?g {\n"
         "        {\n"
-            "            SELECT ?x\n"
-            "            WHERE {\n"
-            "                ?x ?p ?g\n"
-            "            }\n"
-            "        }\n"
-            "    }\n"
-            "}"
-        )
+        "            SELECT ?x\n"
+        "            WHERE {\n"
+        "                ?x ?p ?g\n"
+        "            }\n"
+        "        }\n"
+        "    }\n"
+        "}"
+    )
 
     assert format_string(query) == expected

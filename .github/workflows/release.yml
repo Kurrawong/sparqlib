@@ -17,14 +17,14 @@ jobs:
         with:
           python-version: "3.12"
 
-      - name: Install Poetry
-        uses: snok/install-poetry@v1
+      - name: Install uv
+        uses: astral-sh/setup-uv@v5
 
       - name: Install project
-        run: poetry install --no-interaction
+        run: uv sync
 
       - name: Build wheel
-        run: poetry build -f wheel
+        run: uv build --wheel
 
       - name: Upload release assets
         uses: softprops/action-gh-release@v2

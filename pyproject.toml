@@ -1,23 +1,29 @@
-[tool.poetry]
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
 name = "sparql"
 version = "0.3.0"
 description = "This package provides parsers and serializers for the SPARQL 1.1 Query and Update Language."
-license = "MIT"
-authors = ["Edmond Chuc <edmond@kurrawong.ai>"]
 readme = "README.md"
-packages = [{include = "sparql"}]
+requires-python = ">=3.11"
+license = { text = "MIT" }
+authors = [
+    { name = "Edmond Chuc", email = "edmond@kurrawong.ai" }
+]
+dependencies = [
+    "lark>=1.1.8",
+]
 
-[tool.poetry.dependencies]
-python = ">=3.11.0,<4.0.0"
-lark = "^1.1.8"
+[dependency-groups]
+dev = [
+    "pytest>=7.4.3",
+    "ruff>=0.1.11",
+]
 
-[tool.poetry.group.dev.dependencies]
-pytest = "^7.4.3"
-ruff = "^0.1.11"
-
-[build-system]
-requires = ["poetry-core"]
-build-backend = "poetry.core.masonry.api"
+[tool.hatch.build.targets.wheel]
+packages = ["sparql"]
 
 [tool.ruff]
 select = [

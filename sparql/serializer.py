@@ -2141,8 +2141,12 @@ class SparqlSerializer(IterativeTreeVisitor):
     def _exists_func_enter(self, tree: Tree[Any], context: dict[str, Any]) -> bool:
         exists_token = tree.children[0]
         assert isinstance(exists_token, Token)
+        self._emit_anchored_comments_for_token(exists_token)
         exists_value = self._format_keyword_value(exists_token.value)
-        self._parts.append(f"{self._indent_prefix()}{exists_value}")
+        # `EXISTS` is an expression (used inside FILTER/HAVING/etc), so it should not
+        # inject indentation mid-line. It also requires a space before the following
+        # group graph pattern: `EXISTS { ... }`.
+        self._parts.append(f"{exists_value} ")
         self._stack.append((tree.children[1], TraversalPhase.ENTER, context))
         return True
 
@@ -2151,9 +2155,14 @@ class SparqlSerializer(IterativeTreeVisitor):
         exists_token = tree.children[1]
         assert isinstance(not_token, Token)
         assert isinstance(exists_token, Token)
+        self._emit_anchored_comments_for_token(not_token)
+        self._emit_anchored_comments_for_token(exists_token)
         not_value = self._format_keyword_value(not_token.value)
         exists_value = self._format_keyword_value(exists_token.value)
-        self._parts.append(f"{self._indent_prefix()}{not_value} {exists_value}")
+        # `NOT EXISTS` is an expression (used inside FILTER/HAVING/etc), so it should
+        # not inject indentation mid-line. It also requires a space before the
+        # following group graph pattern: `NOT EXISTS { ... }`.
+        self._parts.append(f"{not_value} {exists_value} ")
         self._stack.append((tree.children[2], TraversalPhase.ENTER, context))
         return True
 

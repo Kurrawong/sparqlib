@@ -44,3 +44,11 @@ def test_bind_as_spacing():
     # Expect "AS ?x"
     assert "AS ?x" in serialized
     assert "AS  ?x" not in serialized
+
+
+def test_filter_not_exists_spacing():
+    query = "SELECT * WHERE { ?s ?p ?o FILTER         NOT EXISTS{?s ?p ?o} }"
+    serialized = serialize(query)
+    assert "FILTER NOT EXISTS {" in serialized
+    assert "FILTER  NOT EXISTS" not in serialized
+    assert "NOT EXISTS{" not in serialized

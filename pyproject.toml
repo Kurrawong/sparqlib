@@ -21,6 +21,8 @@ dev = [
     "mypy>=1.8.0",
     "pre-commit",
     "pytest>=7.4.3",
+    "pytest-cov>=4.0.0",
+    "pytest-xdist>=3.0.0",
     "ruff>=0.1.11",
 ]
 
@@ -60,7 +62,24 @@ disallow_incomplete_defs = false
 disallow_untyped_calls = false
 check_untyped_defs = false
 
+[tool.coverage.run]
+source = ["sparql"]
+
+[tool.coverage.report]
+exclude_lines = [
+    "pragma: no cover",
+    "def __repr__",
+    "raise AssertionError",
+    "if __name__ == .__main__.:",
+]
+
 [tool.pytest.ini_options]
+addopts = [
+    "--cov=sparql",
+    "--cov-report=html",
+    "--cov-report=term-missing",
+    "-n", "auto",
+]
 markers = [
     "performance: marks tests as performance benchmarks (select with '-m performance')",
 ]

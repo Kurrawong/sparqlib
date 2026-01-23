@@ -97,7 +97,7 @@ class TestCommentsPreserved:
             "\n"
             "SELECT ?x # test\n"
             "WHERE { # test\n"
-            "    ?x ?p  ?g\n"
+            "    ?x ?p ?g\n"
             "    FILTER (?x != in:i1) # test\n"
             "}\n"
         )
@@ -113,7 +113,7 @@ class TestCommentsPreserved:
             "SELECT ?x # test\n"
             "WHERE { # test\n"
             "# test\n"
-            "    ?x ?p  ?g\n"
+            "    ?x ?p ?g\n"
             "    FILTER (?x != in:i1) # test\n"
             "}\n"
         )
@@ -126,7 +126,7 @@ class TestCommentsPreserved:
             "SELECT ?x # test\n"
             "WHERE { # test\n"
             "    # test\n"
-            "    ?x ?p  ?g\n"
+            "    ?x ?p ?g\n"
             "    FILTER (?x != in:i1) # test\n"
             "}"
         )

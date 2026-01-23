@@ -1271,7 +1271,12 @@ class SparqlSerializer(IterativeTreeVisitor):
             self._emit_anchored_comments_for_token(by_token)
             prefix += f"{self._format_keyword_value(by_token.value)} "
 
-        self._parts.append(self._indent_prefix() + prefix)
+        # GROUP BY is a solution modifier and should always start on its own line.
+        self._trim_trailing_space()
+        if self._at_line_start():
+            self._parts.append(f"{self._indent_prefix()}{prefix}")
+        else:
+            self._parts.append(f"\n{self._indent_prefix()}{prefix}")
 
         # Traverse children in reverse order, excluding keywords
         for i in range(len(tree.children) - 1, -1, -1):
@@ -1519,8 +1524,15 @@ class SparqlSerializer(IterativeTreeVisitor):
             if isinstance(child, Token) and child.value.lower() == "union":
                 # Preserve original token instance for comment anchoring.
                 self._stack.append((child, TraversalPhase.ENTER, context))
+                # Put UNION on its own line at the current indentation level.
+                # Note: this is computed during ENTER, before children are emitted, so we
+                # must include the newline unconditionally to avoid `}    UNION {`.
                 self._stack.append(
-                    (Token("RAW", self._indent_prefix()), TraversalPhase.ENTER, context)
+                    (
+                        Token("RAW", f"\n{self._indent_prefix()}"),
+                        TraversalPhase.ENTER,
+                        context,
+                    )
                 )
             else:
                 self._stack.append((child, TraversalPhase.ENTER, context))
@@ -1641,6 +1653,11 @@ class SparqlSerializer(IterativeTreeVisitor):
         return True
 
     def _object_list_path_enter(self, tree: Tree, context: dict[str, Any]) -> bool:
+        # Avoid introducing double spaces in `?s ?p ?o` patterns: the token handler
+        # already emits trailing spaces for most tokens.
+        last_char = self._last_char()
+        if last_char is None or last_char.isspace() or last_char in self._NO_SPACE_AFTER:
+            return False
         self._parts.append(" ")
         return False
 

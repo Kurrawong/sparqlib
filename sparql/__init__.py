@@ -79,20 +79,39 @@ def normalize_keyword_tokens(
     """Normalize SPARQL keyword token values to uppercase in a Lark tree."""
     if keyword_set is None:
         keyword_set = SparqlSerializer.KEYWORDS
-    if isinstance(node, Token):
-        value = node.value
+
+    def normalize_token(token: Token) -> Token:
+        value = token.value
         stripped = value.strip()
         if stripped and stripped.upper() in keyword_set:
             leading = value[: len(value) - len(value.lstrip())]
             trailing = value[len(value.rstrip()) :]
-            return Token(node.type, f"{leading}{stripped.upper()}{trailing}")
-        return node
+            return Token(token.type, f"{leading}{stripped.upper()}{trailing}")
+        return token
+
+    if isinstance(node, Token):
+        return normalize_token(node)
     if isinstance(node, Tree):
-        return Tree(
-            node.data,
-            [normalize_keyword_tokens(child, keyword_set) for child in node.children],
-        )
-    return node  # type: ignore[unreachable]
+        stack: list[list[Any]] = [[node, 0, []]]
+        while stack:
+            current, index, new_children = stack[-1]
+            if index < len(current.children):
+                child = current.children[index]
+                stack[-1][1] += 1
+                if isinstance(child, Token):
+                    new_children.append(normalize_token(child))
+                elif isinstance(child, Tree):
+                    stack.append([child, 0, []])
+                else:
+                    new_children.append(child)
+            else:
+                normalized_tree = Tree(current.data, new_children)
+                stack.pop()
+                if stack:
+                    stack[-1][2].append(normalized_tree)
+                else:
+                    return normalized_tree
+    return node
 
 
 def validate(

@@ -7,6 +7,7 @@ well beyond Python's default recursion limit.
 import pytest
 from lark import Token, Tree
 
+from sparql import normalize_keyword_tokens
 from sparql.parser import sparql_query_parser
 from sparql.serializer import SparqlSerializer, get_value
 
@@ -141,6 +142,21 @@ def test_get_value_deep_nesting():
     # Verify we collected the token
     assert len(tokens) == 1
     assert tokens[0].value == "?x"
+
+
+def test_normalize_keyword_tokens_deep_tree():
+    depth = 2000
+    node = Token("KEYWORD", " select ")
+    for i in range(depth):
+        node = Tree(f"level_{i}", [node])
+
+    normalized = normalize_keyword_tokens(node)
+    current = normalized
+    while isinstance(current, Tree):
+        current = current.children[0]
+
+    assert isinstance(current, Token)
+    assert current.value == " SELECT "
 
 
 if __name__ == "__main__":

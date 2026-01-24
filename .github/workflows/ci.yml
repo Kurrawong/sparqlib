@@ -22,14 +22,11 @@ jobs:
 
       - name: Install uv
         uses: astral-sh/setup-uv@v5
-
-      - name: Cache uv dependencies
-        uses: actions/cache@v4
         with:
-          path: ~/.cache/uv
-          key: ${{ runner.os }}-uv-${{ hashFiles('**/pyproject.toml') }}
-          restore-keys: |
-            ${{ runner.os }}-uv-
+          enable-cache: true
+          cache-dependency-glob: |
+            **/pyproject.toml
+            **/uv.lock
 
       - name: Install project
         run: uv sync
@@ -63,15 +60,11 @@ jobs:
 
       - name: Install uv
         uses: astral-sh/setup-uv@v5
-
-      - name: Cache uv dependencies
-        uses: actions/cache@v4
         with:
-          path: ~/.cache/uv
-          key: ${{ runner.os }}-uv-${{ matrix.python-version }}-${{ hashFiles('**/pyproject.toml') }}
-          restore-keys: |
-            ${{ runner.os }}-uv-${{ matrix.python-version }}-
-            ${{ runner.os }}-uv-
+          enable-cache: true
+          cache-dependency-glob: |
+            **/pyproject.toml
+            **/uv.lock
 
       - name: Install project
         run: uv sync
@@ -87,6 +80,7 @@ jobs:
         with:
           name: coverage-python-${{ matrix.python-version }}
           path: .coverage-${{ matrix.python-version }}
+          include-hidden-files: true
           retention-days: 7
 
   coverage-report:

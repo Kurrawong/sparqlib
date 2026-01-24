@@ -106,6 +106,9 @@ def validate(
     When parser_type is None, a unified grammar is used to parse both queries
     and updates without heuristic guessing.
 
+    It first attempts to parse the query as a SPARQL 1.1 query before
+    trying to parse it as a SPARQL 1.1 Update query.
+
     :param query: Input query string.
     :param parser_type: Optional parser type. If provided, only that parser is used.
     :return: True if the query is valid.

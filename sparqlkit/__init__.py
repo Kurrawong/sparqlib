@@ -5,13 +5,13 @@ from typing import Any, Literal
 from lark import Token, Tree
 from lark.exceptions import LarkError, UnexpectedInput
 
-from sparql.comments import attach_comments, scan_raw_comments
-from sparql.parser import (
+from sparqlkit.comments import attach_comments, scan_raw_comments
+from sparqlkit.parser import (
     sparql_parser,
     sparql_query_parser,
     sparql_update_parser,
 )
-from sparql.serializer import SparqlSerializer
+from sparqlkit.serializer import SparqlSerializer
 
 ParserType = Literal["sparql", "sparql_update"]
 

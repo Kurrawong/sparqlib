@@ -1,5 +1,5 @@
-from sparql.parser import sparql_query_parser
-from sparql.serializer import SparqlSerializer
+from sparqlkit.parser import sparql_query_parser
+from sparqlkit.serializer import SparqlSerializer
 
 
 def test_minimal_serialization():

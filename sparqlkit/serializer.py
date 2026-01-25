@@ -372,8 +372,8 @@ class SparqlSerializer(IterativeTreeVisitor):
     while supporting arbitrarily complex structures.
 
     Example:
-        >>> from sparql.parser import sparql_query_parser
-        >>> from sparql.serializer import SparqlSerializer
+        >>> from sparqlkit.parser import sparql_query_parser
+        >>> from sparqlkit.serializer import SparqlSerializer
         >>> tree = sparql_query_parser.parse("SELECT * WHERE { ?s ?p ?o }")
         >>> serializer = SparqlSerializer()
         >>> print(serializer.visit_topdown(tree))

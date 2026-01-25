@@ -1,6 +1,8 @@
-from sparql import format_string, normalize_keyword_tokens
-from sparql.parser import sparql_parser
-from sparql.serializer import SparqlSerializer
+
+import sparqlkit
+from sparqlkit import format_string, normalize_keyword_tokens
+from sparqlkit.parser import sparql_parser
+from sparqlkit.serializer import SparqlSerializer
 
 query = r"""
 SELECT ?search_result_uri ?predicate ?match ?weight (URI(CONCAT("urn:hash:", SHA256(CONCAT(STR(?search_result_uri), STR(?predicate), STR(?match), STR(?weight))))) AS ?hashID)

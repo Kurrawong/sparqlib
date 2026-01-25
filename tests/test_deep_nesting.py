@@ -7,9 +7,9 @@ well beyond Python's default recursion limit.
 import pytest
 from lark import Token, Tree
 
-from sparql import normalize_keyword_tokens
-from sparql.parser import sparql_query_parser
-from sparql.serializer import SparqlSerializer, get_value
+from sparqlkit import normalize_keyword_tokens
+from sparqlkit.parser import sparql_query_parser
+from sparqlkit.serializer import SparqlSerializer, get_value
 
 
 def iterative_tree_eq(t1, t2):

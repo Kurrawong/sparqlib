@@ -7,8 +7,8 @@ from typing import Any
 import pytest
 from lark import Token, Tree
 
-from sparql.parser import sparql_query_parser
-from sparql.serializer import SparqlSerializer
+from sparqlkit.parser import sparql_query_parser
+from sparqlkit.serializer import SparqlSerializer
 
 
 class CustomSerializer(SparqlSerializer):

@@ -75,51 +75,60 @@ def test_format_nonexistent_path(tmp_path: Path):
     assert "No SPARQL files found" in result.output
 
 
-def test_check_formatted_file(formatted_file: Path):
-    result = runner.invoke(app, ["check", str(formatted_file)])
+def test_format_check_formatted_file(formatted_file: Path):
+    result = runner.invoke(app, ["format", "--check", str(formatted_file)])
     assert result.exit_code == 0
     assert "OK" in result.stdout
 
 
-def test_check_unformatted_file(valid_file: Path):
-    result = runner.invoke(app, ["check", str(valid_file)])
+def test_format_check_unformatted_file(valid_file: Path):
+    result = runner.invoke(app, ["format", "--check", str(valid_file)])
     assert result.exit_code == 1
     assert "Would reformat" in result.output
 
 
-def test_check_invalid_file(invalid_file: Path):
-    result = runner.invoke(app, ["check", str(invalid_file)])
+def test_format_check_invalid_file(invalid_file: Path):
+    result = runner.invoke(app, ["format", "--check", str(invalid_file)])
     assert result.exit_code == 1
     assert "Error" in result.output
 
 
-def test_check_formatted_directory(formatted_dir: Path):
-    result = runner.invoke(app, ["check", str(formatted_dir)])
+def test_format_check_formatted_directory(formatted_dir: Path):
+    result = runner.invoke(app, ["format", "--check", str(formatted_dir)])
     assert result.exit_code == 0
     assert "All 2 file(s) OK" in result.stdout
 
 
-def test_check_unformatted_directory(valid_dir: Path):
-    result = runner.invoke(app, ["check", str(valid_dir)])
+def test_format_check_unformatted_directory(valid_dir: Path):
+    result = runner.invoke(app, ["format", "--check", str(valid_dir)])
     assert result.exit_code == 1
     assert "Would reformat" in result.output
 
 
-def test_check_nonexistent_path(tmp_path: Path):
-    result = runner.invoke(app, ["check", str(tmp_path / "nonexistent")])
+def test_format_check_nonexistent_path(tmp_path: Path):
+    result = runner.invoke(app, ["format", "--check", str(tmp_path / "nonexistent")])
     assert result.exit_code == 1
     assert "No SPARQL files found" in result.output
 
 
 def test_no_args_shows_help():
     result = runner.invoke(app, [])
-    assert result.exit_code == 0 or result.exit_code == 2
-    assert "format" in result.output
-    assert "check" in result.output
+    assert "Commands" in result.output
 
 
 def test_help_flag():
     result = runner.invoke(app, ["--help"])
     assert result.exit_code == 0
     assert "format" in result.output
-    assert "check" in result.output
+
+
+def test_short_help_flag():
+    result = runner.invoke(app, ["-h"])
+    assert result.exit_code == 0
+    assert "format" in result.output
+
+
+def test_version_command():
+    result = runner.invoke(app, ["version"])
+    assert result.exit_code == 0
+    assert result.stdout.strip() != ""

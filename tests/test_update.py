@@ -55,5 +55,15 @@ def test_multiple_updates():
     assert ";" in result
 
 
+def test_modify_with_where_newlines_and_empty_where():
+    query = 'WITH <g> INSERT { GRAPH <g> { <s> <p> "f\\"" . } } WHERE {}'
+    tree = sparql_update_parser.parse(query)
+    serializer = SparqlSerializer()
+    result = serializer.visit_topdown(tree)
+    assert "WITH <g>\n" in result
+    assert "\nINSERT" in result
+    assert "\nWHERE {}" in result
+
+
 if __name__ == "__main__":
     pytest.main([__file__])

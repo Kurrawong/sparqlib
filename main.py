@@ -1,5 +1,3 @@
-
-import sparqlkit
 from sparqlkit import format_string, normalize_keyword_tokens
 from sparqlkit.parser import sparql_parser
 from sparqlkit.serializer import SparqlSerializer

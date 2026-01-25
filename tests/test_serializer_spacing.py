@@ -52,3 +52,17 @@ def test_filter_not_exists_spacing():
     assert "FILTER NOT EXISTS {" in serialized
     assert "FILTER  NOT EXISTS" not in serialized
     assert "NOT EXISTS{" not in serialized
+
+
+def test_empty_where_clause_compact():
+    query = "SELECT * WHERE {}"
+    serialized = serialize(query)
+    assert "WHERE {}" in serialized
+    assert "WHERE {\n" not in serialized
+
+
+def test_select_asterisk_brace_spacing():
+    query = "select * { ?s ?p ?o } limit 10"
+    serialized = serialize(query)
+    assert "SELECT * {" in serialized
+    assert "SELECT *{" not in serialized

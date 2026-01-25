@@ -760,6 +760,8 @@ class SparqlSerializer(IterativeTreeVisitor):
         elif token.type == "SELECT_ASTERIX":
             # Special case for SELECT * - don't strip the leading space
             self._parts.append(token_value)
+            self._no_space_after = False
+            self._parts.append(" ")
         elif token.type == "RAW":
             if (
                 self._pending_inline_comments_before_semicolon
@@ -1139,13 +1141,64 @@ class SparqlSerializer(IterativeTreeVisitor):
         return False
 
     def _modify_enter(self, tree: Tree[Any], context: dict[str, Any]) -> bool:
-        return False
+        items: list[Tree[Any] | Token] = []
+        children = tree.children
+        i = 0
+        while i < len(children):
+            child = children[i]
+            if isinstance(child, Token) and child.value.lower() == "with":
+                prefix = (
+                    self._indent_prefix()
+                    if self._at_line_start()
+                    else f"\n{self._indent_prefix()}"
+                )
+                items.append(Token("RAW", prefix))
+                items.append(child)
+                if i + 1 < len(children):
+                    items.append(children[i + 1])
+                    i += 1
+            elif isinstance(child, Token) and child.value.lower() == "where":
+                items.append(Token("RAW", f"\n{self._indent_prefix()}"))
+                items.append(child)
+            else:
+                items.append(child)
+            i += 1
+
+        for item in reversed(items):
+            self._stack.append((item, TraversalPhase.ENTER, context))
+        return True
 
     def _delete_clause_enter(self, tree: Tree[Any], context: dict[str, Any]) -> bool:
-        return False
+        delete_token = self._find_token(tree, "DELETE")
+        if delete_token:
+            self._emit_anchored_comments_for_token(delete_token)
+            self._trim_trailing_space()
+            if not self._at_line_start():
+                self._parts.append("\n")
+            delete_value = self._format_keyword_value(delete_token.value)
+            self._parts.append(f"{self._indent_prefix()}{delete_value} ")
+
+        for i in range(len(tree.children) - 1, -1, -1):
+            child = tree.children[i]
+            if child is not delete_token:
+                self._stack.append((child, TraversalPhase.ENTER, context))
+        return True
 
     def _insert_clause_enter(self, tree: Tree[Any], context: dict[str, Any]) -> bool:
-        return False
+        insert_token = self._find_token(tree, "INSERT")
+        if insert_token:
+            self._emit_anchored_comments_for_token(insert_token)
+            self._trim_trailing_space()
+            if not self._at_line_start():
+                self._parts.append("\n")
+            insert_value = self._format_keyword_value(insert_token.value)
+            self._parts.append(f"{self._indent_prefix()}{insert_value} ")
+
+        for i in range(len(tree.children) - 1, -1, -1):
+            child = tree.children[i]
+            if child is not insert_token:
+                self._stack.append((child, TraversalPhase.ENTER, context))
+        return True
 
     def _using_clause_enter(self, tree: Tree[Any], context: dict[str, Any]) -> bool:
         return False
@@ -1586,7 +1639,28 @@ class SparqlSerializer(IterativeTreeVisitor):
     def _group_graph_pattern_enter(
         self, tree: Tree[Any], context: dict[str, Any]
     ) -> None:
-        self._open_brace()
+        self._open_brace_index += 1
+        inline = self._inline_after_open_brace.get(self._open_brace_index, [])
+        if self._is_empty_group_graph_pattern(tree) and not inline:
+            if self._stack and self._stack[-1][0] is tree:
+                node, phase, _ctx = self._stack[-1]
+                if phase == TraversalPhase.EXIT:
+                    self._stack.pop()
+            if self._at_line_start():
+                self._parts.append(f"{self._indent_prefix()}{{}}")
+            else:
+                self._parts.append("{}")
+            return
+
+        if self._at_line_start():
+            self._parts.append(f"{self._indent_prefix()}{{")
+        else:
+            self._parts.append("{")
+
+        if inline:
+            for c in inline:
+                self._parts.append(f" {c}")
+        self._parts.append("\n")
         self._indent += 1
 
     def _group_graph_pattern_exit(
@@ -1598,6 +1672,16 @@ class SparqlSerializer(IterativeTreeVisitor):
             self._parts.append(f"{self._indent_prefix()}}}")
         else:
             self._parts.append(f"\n{self._indent_prefix()}}}")
+
+    def _is_empty_group_graph_pattern(self, tree: Tree[Any]) -> bool:
+        for child in tree.children:
+            if isinstance(child, Tree):
+                if child.data == "sub_select":
+                    return False
+                if child.data == "group_graph_pattern_sub":
+                    return len(child.children) == 0
+                return False
+        return False
 
     def _group_graph_pattern_sub_other_enter(
         self, tree: Tree[Any], context: dict[str, Any]

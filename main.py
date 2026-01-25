@@ -1,26 +1,85 @@
-from sparql.parser import sparql_parser as sparql_parser
+from sparql import format_string, normalize_keyword_tokens
+from sparql.parser import sparql_parser
 from sparql.serializer import SparqlSerializer
 
-query = r'''
-prefix ex:	<http://www.example.org/schema#>
-prefix in:	<http://www.example.org/instance#>
-
-select ?x where {
-graph ?g {
-  {select ?x where {?x ?p ?g}}
+query = r"""
+SELECT ?search_result_uri ?predicate ?match ?weight (URI(CONCAT("urn:hash:", SHA256(CONCAT(STR(?search_result_uri), STR(?predicate), STR(?match), STR(?weight))))) AS ?hashID)
+WHERE {
+SELECT ?search_result_uri ?predicate ?match (SUM(?w) AS ?weight)
+WHERE
+{
+?search_result_uri ?predicate ?match .
+VALUES ?predicate { <bar> }
+{
+?search_result_uri ?predicate ?match .
+BIND (100 AS ?w)
+FILTER (LCASE(?match) = "$term")
+}
+UNION
+{
+?search_result_uri ?predicate ?match .
+BIND (20 AS ?w)
+FILTER (REGEX(?match, "^$term", "i"))
+}
+UNION
+{
+?search_result_uri ?predicate ?match .
+BIND (10 AS ?w)
+FILTER (REGEX(?match, "$term", "i"))
 }
 }
-'''
+GROUP BY ?search_result_uri ?predicate ?match
+}
+ORDER BY DESC(?weight)
+"""
 
+print(f"Using serializer: {SparqlSerializer.__name__}")
+
+# Original tree
 tree = sparql_parser.parse(query)
-
-sparql_serializer = SparqlSerializer()
-sparql_serializer.visit_topdown(tree)
-
-print(query)
 print(f"Tree: {tree}")
-print(f"\nNew query:\n{sparql_serializer.result}")
 
-new_tree = sparql_parser.parse(sparql_serializer.result)
-print(f"\nQuery is the same: {tree == new_tree}")
-assert tree == new_tree
+# Format
+formatted = format_string(query)
+print(f"\nNew query:\n{formatted}")
+
+# Parse back to verify
+new_tree = sparql_parser.parse(formatted)
+normalized_tree = normalize_keyword_tokens(tree)
+normalized_new_tree = normalize_keyword_tokens(new_tree)
+print(f"\nQuery is the same: {normalized_tree == normalized_new_tree}")
+assert normalized_tree == normalized_new_tree
+
+expected = """\
+SELECT ?search_result_uri ?predicate ?match ?weight (URI(CONCAT ("urn:hash:", SHA256(CONCAT (STR(?search_result_uri), STR(?predicate), STR(?match), STR(?weight))))) AS ?hashID)
+WHERE {
+  SELECT ?search_result_uri ?predicate ?match (SUM(?w) AS ?weight)
+  WHERE {
+    ?search_result_uri ?predicate ?match
+    VALUES ?predicate {
+      <bar>
+    }
+    {
+      ?search_result_uri ?predicate ?match
+      BIND (100  AS ?w) 
+      FILTER (LCASE(?match)= "$term")
+    }
+    UNION {
+      ?search_result_uri ?predicate ?match
+      BIND (20  AS ?w) 
+      FILTER (REGEX(?match, "^$term", "i"))
+    }
+    UNION {
+      ?search_result_uri ?predicate ?match
+      BIND (10  AS ?w) 
+      FILTER (REGEX(?match, "$term", "i"))
+    }
+  }
+  GROUP BY ?search_result_uri ?predicate ?match
+}
+ORDER BY DESC (?weight)""".strip()
+
+assert (
+    formatted
+    == expected
+)

@@ -1,5 +1,5 @@
+from collections.abc import Iterator
 from pathlib import Path
-from typing import Iterator
 
 import pytest
 from _pytest.mark import ParameterSet
@@ -8,7 +8,7 @@ TEST_DIR = Path(__file__).parent
 
 
 def files_from_data_directory(
-    data_directory: Path, xfail: dict[Path, str] = None
+    data_directory: Path, xfail: dict[Path, str] | None = None
 ) -> Iterator[str | ParameterSet]:
     """Return an iterator of files for a paramtrized test.
 
@@ -16,7 +16,8 @@ def files_from_data_directory(
     This may be generalised to accept any file suffixes in the future.
 
     :param data_directory: The directory of files.
-    :param xfail: A dictionary of file paths and the reason on why the test should be xfailed.
+    :param xfail: A dictionary of file paths and the reason on why the test should
+        be xfailed.
     """
     if xfail is None:
         xfail = {}

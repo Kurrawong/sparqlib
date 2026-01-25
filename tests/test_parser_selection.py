@@ -1,7 +1,7 @@
 import pytest
-from lark.exceptions import LarkError
 
 import sparql
+from sparql import SparqlSyntaxError
 
 
 def test_guess_sparql_update():
@@ -36,7 +36,7 @@ def test_guess_sparql():
 
 
 def test_specify_sparql_parser():
-    with pytest.raises(LarkError):
+    with pytest.raises(SparqlSyntaxError):
         sparql.format_string_explicit(
             """
             LOAD <http://example.org/faraway> INTO GRAPH <localCopy>
@@ -46,7 +46,7 @@ def test_specify_sparql_parser():
 
 
 def test_specify_sparql_update_parser():
-    with pytest.raises(LarkError):
+    with pytest.raises(SparqlSyntaxError):
         sparql.format_string_explicit(
             """
             select distinct ?s (count(?s) as ?count)
@@ -64,3 +64,14 @@ def test_specify_sparql_update_parser():
         """,
             parser_type="sparql_update",
         )
+
+
+def test_format_string_parser_type_hint():
+    result = sparql.format_string(
+        """
+        select distinct ?s (count(?s) as ?count)
+        WHERE { ?s ?p ?o }
+    """,
+        parser_type="sparql",
+    )
+    assert result

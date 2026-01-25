@@ -15,74 +15,99 @@ pip install https://github.com/Kurrawong/sparql/archive/refs/tags/<version>.zip
 ## Usage
 
 ```python
-from sparql.parser import sparql_parser, sparql_update_parser
-from sparql.serializer import SparqlSerializer
+import sparql
 
 query = r'''
 PREFIX : <http://www.example.org/>
-
-INSERT DATA { 
-              GRAPH<g1> { _:b1 :p :o } 
-              GRAPH<g2> { _:b1 :p :o } 
-            }
-
+SELECT * WHERE { ?s ?p ?o }
 '''
 
-# For SPARQL 1.1 Update, use sparql_update_parser
-tree = sparql_parser.parse(query)
-
-sparql_serializer = SparqlSerializer()
-sparql_serializer.visit_topdown(tree)
-
-print(query)
-print(f"Tree: {tree}")
-print(f"\nNew query:\n{sparql_serializer.result}")
-
-new_tree = sparql_parser.parse(sparql_serializer.result)
-print(f"\nQuery is the same: {tree == new_tree}")
-assert tree == new_tree
-
+# Use the convenience function
+formatted = sparql.format_string(query)
+print(formatted)
 ```
 
-## Convenience Functions
+### Preserving comments
 
-### Function `sparql.format_string`
-
-For a given SPARQL query string, return a formatted SPARQL query string. This function by default will perform a guess on whether to use a SPARQL 1.1 parser or SPARQL 1.1 Update parser. Otherwise, a specific parser can be specified as a second argument.
+Comments are preserved end-to-end through `format_string` and `parse`/`serialize` by default.
+To disable comment preservation, use `preserve_comments=False`:
 
 ```python
 import sparql
 
-result = sparql.format_string(
-    """
-    select distinct ?s (count(?s) as ?count)
-    FROM <http://dbpedia.org>
-    FROM NAMED <http://dbpedia.org>
-    where {
-        ?s ?p ?o .
-        ?o ?pp ?oo ;
-            ?ppp ?ooo .
-        OPTIONAL {
-            ?s a ?o .
-        } .
-        ?o2 ?p2 ?o3 .
-    }
-"""
-)
+query = "SELECT * WHERE { # comment\n  ?s ?p ?o }\n"
+formatted = sparql.format_string(query)
+print(formatted)
 
-assert result
+tree = sparql.parse(query)
+print(sparql.serialize(tree))
 
-result = sparql.format_string(
-    """
-    LOAD <http://example.org/faraway> INTO GRAPH <localCopy>
-"""
-)
+no_comments = sparql.format_string(query, preserve_comments=False)
+print(no_comments)
+```
 
-assert result
+Notes:
+- Comments are preserved using **stable anchoring** (nearby-token association), not exact original spacing.
+- Comments are emitted as **standalone lines** by default for safety, but common inline forms are preserved:
+  - `SELECT ?x # comment` (inline after a token)
+  - `WHERE { # comment` (inline after `{`)
+  - `FILTER(... ) # comment` (inline after `)`)
+
+For advanced usage with the AST:
+
+```python
+from sparql.parser import sparql_query_parser
+from sparql.serializer import SparqlSerializer
+
+tree = sparql_query_parser.parse(query)
+serializer = SparqlSerializer()
+result = serializer.visit_topdown(tree)
+print(result)
+```
+
+## Features
+
+### Iterative Stack-Based Serializer
+
+The SPARQL serializer uses an iterative stack-based approach, allowing serialization of queries with arbitrary complexity and nesting depth (e.g., 1500+ nested OPTIONALs) without triggering Python's `RecursionError`.
+
+#### Deep Nesting Example
+
+```python
+from sparql.parser import sparql_query_parser
+from sparql.serializer import SparqlSerializer
+
+# Create a deeply nested query string
+depth = 2000
+query = "SELECT * WHERE { " + ("OPTIONAL { " * depth) + "?s ?p ?o" + (" }" * depth) + " }"
+
+# Parse and serialize (no RecursionError)
+tree = sparql_query_parser.parse(query)
+serializer = SparqlSerializer()
+result = serializer.visit_topdown(tree)
+print(f"Successfully serialized query with nesting depth {depth}")
+```
+
+### Extensibility
+
+The serializer can be extended through subclassing to customize output:
+
+```python
+from sparql.serializer import SparqlSerializer
+from lark import Tree
+
+class CustomSerializer(SparqlSerializer):
+    def _build_handler_map(self):
+        handlers = super()._build_handler_map()
+        handlers["var"] = {"enter": CustomSerializer._custom_var_enter, "exit": None}
+        return handlers
+
+    def _custom_var_enter(self, tree: Tree, context: dict) -> bool:
+        self._parts.append(tree.children[0].value.upper())
+        self._parts.append(" ")
+        return True
 ```
 
 ## Conformance
 
-The parser and serializer is passing all positive tests found online, examples from the specification, and also the tests from the https://github.com/w3c/rdf-tests repository.
-
-One single test is marked as an `xfail` in the [test_sparql_test_suite_from_rdf_tests.py](tests/test_sparql_test_suite_from_rdf_tests.py) test due to the limitation of the serializer's implementation. The serializer creates an output string by walking the AST in a recursive manner. In cases where a very large query is provided, this will hit the default Python recursion limit. Future updates to this package may refactor the code to convert its recursive serializer into an interative one.
+The parser and serializer passes all 1,070+ tests including those from the https://github.com/w3c/rdf-tests repository.

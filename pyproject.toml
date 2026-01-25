@@ -52,6 +52,10 @@ select = [
     "UP",  # pyupgrade
 ]
 
+[tool.ruff.lint.per-file-ignores]
+# main.py contains SPARQL query strings that cannot be broken across lines
+"main.py" = ["E501"]
+
 [tool.mypy]
 python_version = "3.11"
 strict = true

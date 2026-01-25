@@ -37,14 +37,8 @@ jobs:
       - name: Run example script
         run: uv run main.py
 
-      - name: Run ruff format check
-        run: uv run ruff format --check sparqlkit tests
-
-      - name: Run ruff lint check
-        run: uv run ruff check sparqlkit tests
-
-      - name: Run mypy type checking
-        run: uv run mypy sparqlkit tests
+      - name: Run code quality checks
+        run: task code:check
 
   test-matrix:
     name: Test Python ${{ matrix.python-version }}

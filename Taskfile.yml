@@ -14,16 +14,16 @@ tasks:
   code:check:
     desc: Check whether code formatting rules apply.
     cmds:
-      - uv run ruff format --check {{.package_name}} tests
-      - uv run ruff check {{.package_name}} tests
-      - uv run mypy {{.package_name}} tests
+      - uv run ruff format --check {{.package_name}} tests main.py
+      - uv run ruff check {{.package_name}} tests main.py
+      - uv run mypy {{.package_name}} tests main.py
 
   code:
     desc: Format and standardise code.
     cmds:
-      - uv run ruff format {{.package_name}} tests
-      - uv run ruff check --fix {{.package_name}} tests
-      - uv run mypy {{.package_name}} tests
+      - uv run ruff format {{.package_name}} tests main.py
+      - uv run ruff check --fix {{.package_name}} tests main.py
+      - uv run mypy {{.package_name}} tests main.py
 
   test:
     desc: Run Python tests.

@@ -79,7 +79,4 @@ WHERE {
 }
 ORDER BY DESC (?weight)""".strip()
 
-assert (
-    formatted
-    == expected
-)
+assert formatted == expected

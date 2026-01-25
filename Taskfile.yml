@@ -6,6 +6,11 @@ vars:
   package_name: sparqlkit
 
 tasks:
+  install:
+    desc: Install project with all extras.
+    cmds:
+      - uv sync --all-extras
+
   code:check:
     desc: Check whether code formatting rules apply.
     cmds:

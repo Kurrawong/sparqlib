@@ -28,8 +28,11 @@ jobs:
             **/pyproject.toml
             **/uv.lock
 
+      - name: Install Task
+        uses: arduino/setup-task@v2
+
       - name: Install project
-        run: uv sync
+        run: task install
 
       - name: Run example script
         run: uv run main.py
@@ -69,8 +72,11 @@ jobs:
             **/pyproject.toml
             **/uv.lock
 
+      - name: Install Task
+        uses: arduino/setup-task@v2
+
       - name: Install project
-        run: uv sync
+        run: task install
 
       - name: Run tests with coverage
         run: uv run pytest -v --cov=sparqlkit

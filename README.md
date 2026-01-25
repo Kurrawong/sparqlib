@@ -10,6 +10,38 @@ Note: This is not a SPARQL processing engine.
 pip install sparqlkit
 ```
 
+For CLI support:
+
+```shell
+pip install sparqlkit[cli]
+```
+
+## CLI
+
+SPARQLKit provides a command-line interface for formatting SPARQL files.
+
+```shell
+sparql --help
+sparql -h
+```
+
+### Commands
+
+#### format
+
+Format SPARQL files in-place:
+
+```shell
+sparql format path/to/query.rq
+sparql format path/to/directory/
+```
+
+Check if files are formatted without making changes:
+
+```shell
+sparql format --check path/to/query.rq
+```
+
 ## Usage
 
 ```python
@@ -45,6 +77,7 @@ print(no_comments)
 ```
 
 Notes:
+
 - Comments are preserved using **stable anchoring** (nearby-token association), not exact original spacing.
 - Comments are emitted as **standalone lines** by default for safety, but common inline forms are preserved:
   - `SELECT ?x # comment` (inline after a token)

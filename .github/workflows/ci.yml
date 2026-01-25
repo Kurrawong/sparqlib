@@ -31,14 +31,17 @@ jobs:
       - name: Install project
         run: uv sync
 
+      - name: Run example script
+        run: uv run main.py
+
       - name: Run ruff format check
-        run: uv run ruff format --check sparql tests
+        run: uv run ruff format --check sparqlkit tests
 
       - name: Run ruff lint check
-        run: uv run ruff check sparql tests
+        run: uv run ruff check sparqlkit tests
 
       - name: Run mypy type checking
-        run: uv run mypy sparql tests
+        run: uv run mypy sparqlkit tests
 
   test-matrix:
     name: Test Python ${{ matrix.python-version }}
@@ -70,7 +73,7 @@ jobs:
         run: uv sync
 
       - name: Run tests with coverage
-        run: uv run pytest -v --cov=sparql
+        run: uv run pytest -v --cov=sparqlkit
 
       - name: Rename coverage file
         run: mv .coverage .coverage-${{ matrix.python-version }}

@@ -1,4 +1,4 @@
-from sparql import parse_query, serialize
+from sparqlkit import parse_query, serialize
 
 
 def test_inline_eof_comment_preserved_after_closing_brace():

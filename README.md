@@ -1,4 +1,4 @@
-# Python SPARQL
+# SPARQLKit
 
 This package provides parsers and serializers for the [SPARQL 1.1 Query Language](https://www.w3.org/TR/sparql11-query/).
 
@@ -6,16 +6,14 @@ Note: This is not a SPARQL processing engine.
 
 ## Install
 
-Replace `<version>` with the latest GitHub release.
-
 ```shell
-pip install https://github.com/Kurrawong/sparql/archive/refs/tags/<version>.zip
+pip install sparqlkit
 ```
 
 ## Usage
 
 ```python
-import sparql
+import sparqlkit
 
 query = r'''
 PREFIX : <http://www.example.org/>
@@ -23,7 +21,7 @@ SELECT * WHERE { ?s ?p ?o }
 '''
 
 # Use the convenience function
-formatted = sparql.format_string(query)
+formatted = sparqlkit.format_string(query)
 print(formatted)
 ```
 
@@ -33,16 +31,16 @@ Comments are preserved end-to-end through `format_string` and `parse`/`serialize
 To disable comment preservation, use `preserve_comments=False`:
 
 ```python
-import sparql
+import sparqlkit
 
 query = "SELECT * WHERE { # comment\n  ?s ?p ?o }\n"
-formatted = sparql.format_string(query)
+formatted = sparqlkit.format_string(query)
 print(formatted)
 
-tree = sparql.parse(query)
-print(sparql.serialize(tree))
+tree = sparqlkit.parse(query)
+print(sparqlkit.serialize(tree))
 
-no_comments = sparql.format_string(query, preserve_comments=False)
+no_comments = sparqlkit.format_string(query, preserve_comments=False)
 print(no_comments)
 ```
 
@@ -56,8 +54,8 @@ Notes:
 For advanced usage with the AST:
 
 ```python
-from sparql.parser import sparql_query_parser
-from sparql.serializer import SparqlSerializer
+from sparqlkit.parser import sparql_query_parser
+from sparqlkit.serializer import SparqlSerializer
 
 tree = sparql_query_parser.parse(query)
 serializer = SparqlSerializer()
@@ -74,8 +72,8 @@ The SPARQL serializer uses an iterative stack-based approach, allowing serializa
 #### Deep Nesting Example
 
 ```python
-from sparql.parser import sparql_query_parser
-from sparql.serializer import SparqlSerializer
+from sparqlkit.parser import sparql_query_parser
+from sparqlkit.serializer import SparqlSerializer
 
 # Create a deeply nested query string
 depth = 2000
@@ -93,7 +91,7 @@ print(f"Successfully serialized query with nesting depth {depth}")
 The serializer can be extended through subclassing to customize output:
 
 ```python
-from sparql.serializer import SparqlSerializer
+from sparqlkit.serializer import SparqlSerializer
 from lark import Tree
 
 class CustomSerializer(SparqlSerializer):

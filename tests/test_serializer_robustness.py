@@ -1,7 +1,7 @@
 import pytest
 from lark import Token, Tree
 
-from sparql.serializer import SparqlSerializer
+from sparqlkit.serializer import SparqlSerializer
 
 
 class TestRobustness:

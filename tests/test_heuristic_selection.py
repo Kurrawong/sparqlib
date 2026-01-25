@@ -1,6 +1,6 @@
 import pytest
 
-from sparql import SparqlSyntaxError, format_string, parse, validate
+from sparqlkit import SparqlSyntaxError, format_string, parse, validate
 
 
 def test_format_string_handles_query_and_update():

@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "sparqlkit"
-version = "0.3.0"
+version = "0.0.0.dev0" # placeholder; set on release by CI
 description = "This package provides parsers and serializers for the SPARQL 1.1 Query and Update Language."
 readme = "README.md"
 requires-python = ">=3.11"

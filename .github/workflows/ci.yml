@@ -29,7 +29,7 @@ jobs:
             **/uv.lock
 
       - name: Install Task
-        uses: arduino/setup-task@v2
+        uses: go-task/setup-task@v1
 
       - name: Install project
         run: task install
@@ -67,7 +67,7 @@ jobs:
             **/uv.lock
 
       - name: Install Task
-        uses: arduino/setup-task@v2
+        uses: go-task/setup-task@v1
 
       - name: Install project
         run: task install

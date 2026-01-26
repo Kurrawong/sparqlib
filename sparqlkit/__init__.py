@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from dataclasses import dataclass
+from enum import Enum
 from typing import Any, Literal
 
 from lark import Token, Tree
@@ -28,9 +30,57 @@ __all__ = [
     "validate",
     "validate_query",
     "validate_update",
+    "statement_type",
+    "statement_type_from_string",
     "SparqlSyntaxError",
+    "SparqlTypeError",
+    "SparqlType",
+    "QuerySubType",
+    "UpdateSubType",
+    "SparqlStatementType",
     "ParserType",
 ]
+
+
+class SparqlType(Enum):
+    """The top-level type of a SPARQL statement."""
+
+    QUERY = "query"
+    UPDATE = "update"
+
+
+class QuerySubType(Enum):
+    """Sub-types for SPARQL queries."""
+
+    SELECT = "select"
+    CONSTRUCT = "construct"
+    DESCRIBE = "describe"
+    ASK = "ask"
+
+
+class UpdateSubType(Enum):
+    """Sub-types for SPARQL updates."""
+
+    INSERT_WHERE = "insert_where"
+    INSERT_DATA = "insert_data"
+    MODIFY = "modify"
+    DELETE_WHERE = "delete_where"
+    DELETE_DATA = "delete_data"
+    DROP = "drop"
+    CLEAR = "clear"
+    LOAD = "load"
+    CREATE = "create"
+    ADD = "add"
+    MOVE = "move"
+    COPY = "copy"
+
+
+@dataclass
+class SparqlStatementType:
+    """The type and sub-type of a SPARQL statement."""
+
+    type: SparqlType
+    subtype: QuerySubType | UpdateSubType
 
 
 class SparqlSyntaxError(Exception):
@@ -63,6 +113,10 @@ class SparqlSyntaxError(Exception):
         if self.line is not None and self.column is not None:
             return f"{self.message} (line {self.line}, column {self.column})"
         return self.message
+
+
+class SparqlTypeError(Exception):
+    """Raised when unable to determine the SPARQL statement type."""
 
 
 def _wrap_lark_error(error: Exception, parser_type: str) -> SparqlSyntaxError:
@@ -412,3 +466,141 @@ def serialize(
     # Normalize leading/trailing whitespace/newlines so callers get stable output
     # regardless of input surrounding whitespace.
     return serializer.result.strip()
+
+
+def _find_child(tree: Tree[Any], *names: str) -> Tree[Any] | None:
+    """Find the first child tree with one of the given names."""
+    for child in tree.children:
+        if isinstance(child, Tree) and child.data in names:
+            return child
+    return None
+
+
+def _has_child(tree: Tree[Any], name: str) -> bool:
+    """Check if a tree has a child with the given name."""
+    return any(
+        isinstance(child, Tree) and child.data == name for child in tree.children
+    )
+
+
+_QUERY_SUBTYPE_MAP: dict[str, QuerySubType] = {
+    "select_query": QuerySubType.SELECT,
+    "construct_query": QuerySubType.CONSTRUCT,
+    "describe_query": QuerySubType.DESCRIBE,
+    "ask_query": QuerySubType.ASK,
+}
+
+_UPDATE_SUBTYPE_MAP: dict[str, UpdateSubType] = {
+    "load": UpdateSubType.LOAD,
+    "clear": UpdateSubType.CLEAR,
+    "drop": UpdateSubType.DROP,
+    "add": UpdateSubType.ADD,
+    "move": UpdateSubType.MOVE,
+    "copy": UpdateSubType.COPY,
+    "create": UpdateSubType.CREATE,
+    "insert_data": UpdateSubType.INSERT_DATA,
+    "delete_data": UpdateSubType.DELETE_DATA,
+}
+
+
+def _get_modify_subtype(modify_tree: Tree[Any]) -> UpdateSubType:
+    """Determine the subtype of a modify operation."""
+    has_delete = _has_child(modify_tree, "delete_clause")
+    has_insert = _has_child(modify_tree, "insert_clause")
+
+    if has_delete and has_insert:
+        return UpdateSubType.MODIFY
+    elif has_insert:
+        return UpdateSubType.INSERT_WHERE
+    else:
+        return UpdateSubType.DELETE_WHERE
+
+
+def _get_update_subtype(update1_tree: Tree[Any]) -> UpdateSubType:
+    """Determine the subtype of an update1 node."""
+    for child in update1_tree.children:
+        if isinstance(child, Tree):
+            if child.data in _UPDATE_SUBTYPE_MAP:
+                return _UPDATE_SUBTYPE_MAP[child.data]
+            elif child.data == "delete_where":
+                return UpdateSubType.DELETE_WHERE
+            elif child.data == "modify":
+                return _get_modify_subtype(child)
+
+    raise SparqlTypeError(f"Unknown update subtype in tree: {update1_tree}")
+
+
+def statement_type(tree: Tree[Any]) -> SparqlStatementType:
+    """Determine the type and sub-type of a SPARQL statement from its AST.
+
+    :param tree: A lark.Tree representing a parsed SPARQL query or update.
+    :return: A SparqlStatementType with the type and subtype.
+    :raises SparqlTypeError: If the statement type cannot be determined.
+    """
+    if not isinstance(tree, Tree):
+        raise SparqlTypeError(f"Expected a Tree, got {type(tree).__name__}")
+
+    root = tree
+    if root.data == "unit":
+        child = _find_child(root, "query_unit", "update_unit")
+        if child is None:
+            raise SparqlTypeError("No query_unit or update_unit found in tree")
+        root = child
+
+    if root.data == "query_unit":
+        query_tree = _find_child(root, "query")
+        if query_tree is None:
+            raise SparqlTypeError("No query found in query_unit")
+
+        for name, subtype in _QUERY_SUBTYPE_MAP.items():
+            if _find_child(query_tree, name) is not None:
+                return SparqlStatementType(SparqlType.QUERY, subtype)
+
+        raise SparqlTypeError("Unknown query subtype")
+
+    elif root.data == "update_unit":
+        update_tree = _find_child(root, "update")
+        if update_tree is None:
+            raise SparqlTypeError("No update found in update_unit")
+
+        update1_tree = _find_child(update_tree, "update1")
+        if update1_tree is None:
+            raise SparqlTypeError("No update1 found in update")
+
+        update_subtype = _get_update_subtype(update1_tree)
+        return SparqlStatementType(SparqlType.UPDATE, update_subtype)
+
+    elif root.data == "query":
+        for name, query_subtype in _QUERY_SUBTYPE_MAP.items():
+            if _find_child(root, name) is not None:
+                return SparqlStatementType(SparqlType.QUERY, query_subtype)
+        raise SparqlTypeError("Unknown query subtype")
+
+    elif root.data == "update":
+        update1_tree = _find_child(root, "update1")
+        if update1_tree is None:
+            raise SparqlTypeError("No update1 found in update")
+
+        update_subtype = _get_update_subtype(update1_tree)
+        return SparqlStatementType(SparqlType.UPDATE, update_subtype)
+
+    else:
+        raise SparqlTypeError(f"Unexpected root node: {root.data}")
+
+
+def statement_type_from_string(
+    query: str,
+    parser_type: ParserType | None = None,
+) -> SparqlStatementType:
+    """Parse a SPARQL string and determine its statement type and sub-type.
+
+    This is a convenience function that combines parse() and statement_type().
+
+    :param query: Input SPARQL query or update string.
+    :param parser_type: Optional parser type. If None, uses unified grammar.
+    :return: A SparqlStatementType with the type and subtype.
+    :raises SparqlSyntaxError: If the query has a syntax error.
+    :raises SparqlTypeError: If the statement type cannot be determined.
+    """
+    tree = parse(query, parser_type=parser_type, preserve_comments=False)
+    return statement_type(tree)

@@ -6,7 +6,7 @@ combinations that might cause incorrect spacing.
 
 import pytest
 
-from sparqlkit import format_string
+from sparqlib import format_string
 
 
 class TestFunctionSpacing:

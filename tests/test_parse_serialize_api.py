@@ -3,7 +3,7 @@
 import pytest
 from lark import Tree
 
-from sparqlkit import (
+from sparqlib import (
     SparqlSyntaxError,
     parse,
     parse_query,

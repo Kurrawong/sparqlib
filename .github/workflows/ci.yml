@@ -73,7 +73,7 @@ jobs:
         run: task install
 
       - name: Run tests with coverage
-        run: uv run pytest -v --cov=sparqlkit
+        run: uv run pytest -v --cov=sparqlib
 
       - name: Rename coverage file
         run: mv .coverage .coverage-${{ matrix.python-version }}

@@ -1,4 +1,4 @@
-from sparqlkit import format_string
+from sparqlib import format_string
 
 
 def test_serializer_opinionated_formatting():

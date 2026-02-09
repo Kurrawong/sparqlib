@@ -3,7 +3,7 @@ from pathlib import Path
 import pytest
 from typer.testing import CliRunner
 
-from sparqlkit.cli import app
+from sparqlib.cli import app
 
 runner = CliRunner()
 

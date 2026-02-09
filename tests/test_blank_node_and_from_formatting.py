@@ -1,6 +1,6 @@
 """Regression tests for blank node property list and FROM clause formatting."""
 
-from sparqlkit import format_query
+from sparqlib import format_query
 
 
 class TestSelectAsteriskSpacing:

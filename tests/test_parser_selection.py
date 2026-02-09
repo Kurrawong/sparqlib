@@ -1,11 +1,11 @@
 import pytest
 
-import sparqlkit
-from sparqlkit import SparqlSyntaxError
+import sparqlib
+from sparqlib import SparqlSyntaxError
 
 
 def test_guess_sparql_update():
-    result = sparqlkit.format_string(
+    result = sparqlib.format_string(
         """
         LOAD <http://example.org/faraway> INTO GRAPH <localCopy>
     """
@@ -15,7 +15,7 @@ def test_guess_sparql_update():
 
 
 def test_guess_sparql():
-    result = sparqlkit.format_string(
+    result = sparqlib.format_string(
         """
         select distinct ?s (count(?s) as ?count)
         FROM <http://dbpedia.org>
@@ -37,7 +37,7 @@ def test_guess_sparql():
 
 def test_specify_sparql_parser():
     with pytest.raises(SparqlSyntaxError):
-        sparqlkit.format_string_explicit(
+        sparqlib.format_string_explicit(
             """
             LOAD <http://example.org/faraway> INTO GRAPH <localCopy>
         """,
@@ -47,7 +47,7 @@ def test_specify_sparql_parser():
 
 def test_specify_sparql_update_parser():
     with pytest.raises(SparqlSyntaxError):
-        sparqlkit.format_string_explicit(
+        sparqlib.format_string_explicit(
             """
             select distinct ?s (count(?s) as ?count)
         FROM <http://dbpedia.org>
@@ -67,7 +67,7 @@ def test_specify_sparql_update_parser():
 
 
 def test_format_string_parser_type_hint():
-    result = sparqlkit.format_string(
+    result = sparqlib.format_string(
         """
         select distinct ?s (count(?s) as ?count)
         WHERE { ?s ?p ?o }

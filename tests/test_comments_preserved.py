@@ -1,6 +1,6 @@
 import pytest
 
-import sparqlkit
+import sparqlib
 
 
 def _assert_has_comment_line(output: str, comment: str) -> None:
@@ -17,12 +17,12 @@ class TestCommentsPreserved:
             "SELECT * WHERE { ?s ?p ?o }\n"
         )
 
-        formatted = sparqlkit.format_string(query, preserve_comments=True)
+        formatted = sparqlib.format_string(query, preserve_comments=True)
         _assert_has_comment_line(formatted, "# top comment")
         _assert_has_comment_line(formatted, "# between prologue and query")
 
         # Round-trip: formatted output should still parse.
-        sparqlkit.parse(formatted)
+        sparqlib.parse(formatted)
 
     def test_where_comments_preserved_near_graph_patterns(self):
         query = (
@@ -35,16 +35,16 @@ class TestCommentsPreserved:
             "}\n"
         )
 
-        formatted = sparqlkit.format_string(query, preserve_comments=True)
+        formatted = sparqlib.format_string(query, preserve_comments=True)
         _assert_has_comment_line(formatted, "# before optional")
         _assert_has_comment_line(formatted, "# before filter")
-        sparqlkit.parse(formatted)
+        sparqlib.parse(formatted)
 
     def test_eof_comment_preserved(self):
         query = "SELECT * WHERE { ?s ?p ?o }\n# end"
-        formatted = sparqlkit.format_string(query, preserve_comments=True)
+        formatted = sparqlib.format_string(query, preserve_comments=True)
         _assert_has_comment_line(formatted, "# end")
-        sparqlkit.parse(formatted)
+        sparqlib.parse(formatted)
 
     def test_stability_format_twice_keeps_comments(self):
         query = (
@@ -54,21 +54,21 @@ class TestCommentsPreserved:
             "  OPTIONAL { ?s ?p2 ?o2 }\n"
             "}\n"
         )
-        formatted1 = sparqlkit.format_string(query, preserve_comments=True)
-        formatted2 = sparqlkit.format_string(formatted1, preserve_comments=True)
+        formatted1 = sparqlib.format_string(query, preserve_comments=True)
+        formatted2 = sparqlib.format_string(formatted1, preserve_comments=True)
 
         assert formatted2.count("# keep me") == 1
-        sparqlkit.parse(formatted2)
+        sparqlib.parse(formatted2)
 
     def test_ast_path_preserve_comments_toggle_in_serialize(self):
         query = "SELECT * WHERE { # c\n ?s ?p ?o }\n"
 
-        tree = sparqlkit.parse(query, preserve_comments=True)
+        tree = sparqlib.parse(query, preserve_comments=True)
 
-        with_comments = sparqlkit.serialize(tree, preserve_comments=True)
+        with_comments = sparqlib.serialize(tree, preserve_comments=True)
         assert "# c" in with_comments
 
-        without_comments = sparqlkit.serialize(tree, preserve_comments=False)
+        without_comments = sparqlib.serialize(tree, preserve_comments=False)
         assert "# c" not in without_comments
 
     def test_indentation_preserved_for_nested_select_with_anchored_comment(self):
@@ -84,7 +84,7 @@ class TestCommentsPreserved:
             "}\n"
         )
 
-        formatted = sparqlkit.format_string(query)
+        formatted = sparqlib.format_string(query)
         # Inner SELECT should be indented (it appears under GRAPH -> { -> subselect).
         # With 2-space indent default, 3 levels = 6 spaces.
         assert "\n      SELECT ?x\n" in formatted
@@ -101,7 +101,7 @@ class TestCommentsPreserved:
             "}\n"
         )
 
-        formatted = sparqlkit.format_string(query)
+        formatted = sparqlib.format_string(query)
         assert formatted.strip("\n") == query.strip("\n")
 
     def test_prefix_spacing_and_standalone_comment_indentation(self):
@@ -130,7 +130,7 @@ class TestCommentsPreserved:
             "}"
         )
 
-        assert sparqlkit.format_string(query) == expected
+        assert sparqlib.format_string(query) == expected
 
     def test_inline_comments_after_semicolons_keep_semicolons_inline(self):
         query = (
@@ -168,9 +168,9 @@ class TestCommentsPreserved:
             "}"
         )
 
-        formatted = sparqlkit.format_string(query, preserve_comments=True)
+        formatted = sparqlib.format_string(query, preserve_comments=True)
         assert formatted == expected
-        sparqlkit.parse(formatted)
+        sparqlib.parse(formatted)
 
 
 @pytest.mark.parametrize(
@@ -181,6 +181,6 @@ class TestCommentsPreserved:
     ],
 )
 def test_update_comments_preserved(query: str):
-    formatted = sparqlkit.format_string(query, preserve_comments=True)
+    formatted = sparqlib.format_string(query, preserve_comments=True)
     assert "# c" in formatted
-    sparqlkit.parse(formatted)
+    sparqlib.parse(formatted)

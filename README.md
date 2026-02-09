@@ -1,4 +1,4 @@
-# SPARQLKit
+# SPARQLib
 
 This package provides parsers and serializers for the [SPARQL 1.1 Query Language](https://www.w3.org/TR/sparql11-query/).
 
@@ -7,22 +7,22 @@ Note: This is not a SPARQL processing engine.
 ## Install
 
 ```shell
-pip install sparqlkit
+pip install sparqlib
 ```
 
 For CLI support:
 
 ```shell
-pip install sparqlkit[cli]
+pip install sparqlib[cli]
 ```
 
 ## CLI
 
-SPARQLKit provides a command-line interface for formatting SPARQL files.
+SPARQLib provides a command-line interface for formatting SPARQL files.
 
 ```shell
-sparql --help
-sparql -h
+sparqlib --help
+sparqlib -h
 ```
 
 ### Commands
@@ -32,20 +32,20 @@ sparql -h
 Format SPARQL files in-place:
 
 ```shell
-sparql format path/to/query.rq
-sparql format path/to/directory/
+sparqlib format path/to/query.rq
+sparqlib format path/to/directory/
 ```
 
 Check if files are formatted without making changes:
 
 ```shell
-sparql format --check path/to/query.rq
+sparqlib format --check path/to/query.rq
 ```
 
 ## Usage
 
 ```python
-import sparqlkit
+import sparqlib
 
 query = r'''
 PREFIX : <http://www.example.org/>
@@ -53,7 +53,7 @@ SELECT * WHERE { ?s ?p ?o }
 '''
 
 # Use the convenience function
-formatted = sparqlkit.format_string(query)
+formatted = sparqlib.format_string(query)
 print(formatted)
 ```
 
@@ -62,16 +62,16 @@ print(formatted)
 Determine the type and sub-type of a SPARQL statement:
 
 ```python
-import sparqlkit
+import sparqlib
 
 # From a statement string
-result = sparqlkit.statement_type_from_string("SELECT * WHERE { ?s ?p ?o }")
+result = sparqlib.statement_type_from_string("SELECT * WHERE { ?s ?p ?o }")
 print(result.type)     # SparqlType.QUERY
 print(result.subtype)  # QuerySubType.SELECT
 
 # From a parsed tree
-tree = sparqlkit.parse("INSERT DATA { <s> <p> <o> }")
-result = sparqlkit.statement_type(tree)
+tree = sparqlib.parse("INSERT DATA { <s> <p> <o> }")
+result = sparqlib.statement_type(tree)
 print(result.type)     # SparqlType.UPDATE
 print(result.subtype)  # UpdateSubType.INSERT_DATA
 ```
@@ -88,16 +88,16 @@ Comments are preserved end-to-end through `format_string` and `parse`/`serialize
 To disable comment preservation, use `preserve_comments=False`:
 
 ```python
-import sparqlkit
+import sparqlib
 
 query = "SELECT * WHERE { # comment\n  ?s ?p ?o }\n"
-formatted = sparqlkit.format_string(query)
+formatted = sparqlib.format_string(query)
 print(formatted)
 
-tree = sparqlkit.parse(query)
-print(sparqlkit.serialize(tree))
+tree = sparqlib.parse(query)
+print(sparqlib.serialize(tree))
 
-no_comments = sparqlkit.format_string(query, preserve_comments=False)
+no_comments = sparqlib.format_string(query, preserve_comments=False)
 print(no_comments)
 ```
 
@@ -112,8 +112,8 @@ Notes:
 For advanced usage with the AST:
 
 ```python
-from sparqlkit.parser import sparql_query_parser
-from sparqlkit.serializer import SparqlSerializer
+from sparqlib.parser import sparql_query_parser
+from sparqlib.serializer import SparqlSerializer
 
 tree = sparql_query_parser.parse(query)
 serializer = SparqlSerializer()
@@ -130,8 +130,8 @@ The SPARQL serializer uses an iterative stack-based approach, allowing serializa
 #### Deep Nesting Example
 
 ```python
-from sparqlkit.parser import sparql_query_parser
-from sparqlkit.serializer import SparqlSerializer
+from sparqlib.parser import sparql_query_parser
+from sparqlib.serializer import SparqlSerializer
 
 # Create a deeply nested query string
 depth = 2000
@@ -149,7 +149,7 @@ print(f"Successfully serialized query with nesting depth {depth}")
 The serializer can be extended through subclassing to customize output:
 
 ```python
-from sparqlkit.serializer import SparqlSerializer
+from sparqlib.serializer import SparqlSerializer
 from lark import Tree
 
 class CustomSerializer(SparqlSerializer):

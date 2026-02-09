@@ -1,4 +1,4 @@
-from sparqlkit import format_query, format_update
+from sparqlib import format_query, format_update
 
 
 def test_update_with_insert_and_empty_where():

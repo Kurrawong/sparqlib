@@ -1,4 +1,4 @@
-from sparqlkit import format_string
+from sparqlib import format_string
 
 EXAMPLE_QUERY = (
     'SELECT ?search_result_uri ?predicate ?match ?weight (URI(CONCAT("urn:hash:", '

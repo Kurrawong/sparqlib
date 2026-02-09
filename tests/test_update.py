@@ -1,7 +1,7 @@
 import pytest
 
-from sparqlkit.parser import sparql_update_parser
-from sparqlkit.serializer import SparqlSerializer
+from sparqlib.parser import sparql_update_parser
+from sparqlib.serializer import SparqlSerializer
 
 
 def test_insert_data():

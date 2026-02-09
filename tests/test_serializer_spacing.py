@@ -1,5 +1,5 @@
-from sparqlkit import parse_query
-from sparqlkit.serializer import SparqlSerializer
+from sparqlib import parse_query
+from sparqlib.serializer import SparqlSerializer
 
 
 def serialize(query):

@@ -1,7 +1,7 @@
 import pytest
 from lark import Tree
 
-from sparqlkit import (
+from sparqlib import (
     QuerySubType,
     SparqlStatementType,
     SparqlType,

@@ -527,7 +527,7 @@ wheels = [
 ]
 
 [[package]]
-name = "sparqlkit"
+name = "sparqlib"
 version = "0.0.0.dev0"
 source = { editable = "." }
 dependencies = [

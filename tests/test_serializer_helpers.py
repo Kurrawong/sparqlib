@@ -1,7 +1,7 @@
 import pytest
 from lark import Token, Tree
 
-from sparqlkit.serializer import (
+from sparqlib.serializer import (
     SerializerError,
     _safe_get_child,
     get_iri,

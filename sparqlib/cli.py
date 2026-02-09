@@ -2,14 +2,14 @@ try:
     import typer
 except ImportError as e:
     raise ImportError(
-        "CLI requires the 'cli' extra. Install with: pip install sparqlkit[cli]"
+        "CLI requires the 'cli' extra. Install with: pip install sparqlib[cli]"
     ) from e
 
 import importlib.metadata
 from pathlib import Path
 from typing import Annotated
 
-from sparqlkit import SparqlSyntaxError, format_string
+from sparqlib import SparqlSyntaxError, format_string
 
 SPARQL_EXTENSIONS = (".rq", ".sparql")
 
@@ -22,8 +22,8 @@ app = typer.Typer(
 
 @app.command()
 def version() -> None:
-    """Show the sparqlkit version."""
-    typer.echo(importlib.metadata.version("sparqlkit"))
+    """Show the sparqlib version."""
+    typer.echo(importlib.metadata.version("sparqlib"))
 
 
 def _collect_files(path: Path) -> list[Path]:

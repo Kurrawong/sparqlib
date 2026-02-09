@@ -4,9 +4,9 @@ from typing import Any
 import lark
 import pytest
 
-from sparqlkit import normalize_keyword_tokens
-from sparqlkit.parser import sparql_query_parser, sparql_update_parser
-from sparqlkit.serializer import SparqlSerializer
+from sparqlib import normalize_keyword_tokens
+from sparqlib.parser import sparql_query_parser, sparql_update_parser
+from sparqlib.serializer import SparqlSerializer
 
 TEST_DIR = Path(__file__).parent
 

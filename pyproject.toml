@@ -3,7 +3,7 @@ requires = ["hatchling"]
 build-backend = "hatchling.build"
 
 [project]
-name = "sparqlkit"
+name = "sparqlib"
 version = "0.0.0.dev0" # placeholder; set on release by CI
 description = "This package provides parsers and serializers for the SPARQL 1.1 Query and Update Language."
 readme = "README.md"
@@ -20,7 +20,7 @@ dependencies = [
 cli = ["typer>=0.12"]
 
 [project.scripts]
-sparql = "sparqlkit.cli:app"
+sparqlib = "sparqlib.cli:app"
 
 [dependency-groups]
 dev = [
@@ -33,7 +33,7 @@ dev = [
 ]
 
 [tool.hatch.build.targets.wheel]
-packages = ["sparqlkit"]
+packages = ["sparqlib"]
 
 [tool.ruff]
 target-version = "py311"
@@ -73,7 +73,7 @@ disallow_untyped_calls = false
 check_untyped_defs = false
 
 [tool.coverage.run]
-source = ["sparqlkit"]
+source = ["sparqlib"]
 
 [tool.coverage.report]
 exclude_lines = [
@@ -85,7 +85,7 @@ exclude_lines = [
 
 [tool.pytest.ini_options]
 addopts = [
-    "--cov=sparqlkit",
+    "--cov=sparqlib",
     "--cov-report=html",
     "--cov-report=term-missing",
     "-n", "auto",

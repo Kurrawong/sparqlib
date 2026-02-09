@@ -45,10 +45,10 @@ jobs:
         uses: softprops/action-gh-release@v2
         if: startsWith(github.ref, 'refs/tags/')
         with:
-          files: ./dist/sparqlkit-${{ steps.version.outputs.VALUE }}-py3-none-any.whl
+          files: ./dist/sparqlib-${{ steps.version.outputs.VALUE }}-py3-none-any.whl
 
       - name: Rename wheel
-        run: mv ./dist/sparqlkit-${{ steps.version.outputs.VALUE }}-py3-none-any.whl ./dist/sparqlkit-1-py3-none-any.whl
+        run: mv ./dist/sparqlib-${{ steps.version.outputs.VALUE }}-py3-none-any.whl ./dist/sparqlib-1-py3-none-any.whl
 
       - name: Deploy 🚀
         uses: JamesIves/github-pages-deploy-action@v4

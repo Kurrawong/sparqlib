@@ -10,8 +10,8 @@ from pathlib import Path
 
 import pytest
 
-from sparqlkit.parser import sparql_query_parser
-from sparqlkit.serializer import SparqlSerializer
+from sparqlib.parser import sparql_query_parser
+from sparqlib.serializer import SparqlSerializer
 
 SPEC_DATA_DIR = Path(__file__).parent / "data/sparql_spec_examples"
 
